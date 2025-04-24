@@ -1,0 +1,135 @@
+     body {
+            display: flex;
+            background: linear-gradient(to right, #d4e7c5, #b8decc, #a2c7a1);
+            font-family: Arial, sans-serif;
+        }
+        .right-panel {
+            width: 30%;
+            background: #6b8e68;
+            text-align: center;
+            border-left: 3px solid #4f704d;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .left-panel {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        canvas {
+            border: 3px solid #4f704d;
+            cursor: crosshair;
+            background: white;
+        }
+        .toolbar {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* 2 columns */
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .toolbar-section {
+            margin-bottom: 20px;
+        }
+        .toolbar-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: white;
+        }
+        button {
+            background: #8fb996;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #6b8e68;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .title-box {
+            background: #4f704d;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        .icon-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #8fb996;
+            border: none;
+            cursor: pointer;
+        }
+        .icon-button:hover {
+            background: #6b8e68;
+        }
+        .icon-button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .icon-button img {
+            width: 30px;
+            height: 30px;
+        }
+        .timer-box {
+            font-size: 20px;
+            font-weight: bold;
+            background: #4f704d;
+            color: white;
+            padding: 10px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        .size-adjustment {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .size-adjustment label {
+            font-size: 16px;
+            color: white;
+            margin-bottom: 5px;
+        }
+        .color-picker {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .color-picker label {
+            font-size: 16px;
+            color: white;
+        }
+        .submit-button {
+            margin-top: auto; /* Push to the bottom */
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+        }
+        .prompt-display {
+            position: absolute;
+            top: 10px; /* Position at the top of the canvas */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 255, 255, 0.9); /* Semi-transparent white background */
+            padding: 10px 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 10; /* Ensure it's above the canvas */
+        }

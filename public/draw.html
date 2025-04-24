@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Room</title>
+    <link rel="stylesheet" href="draw.css">
+</head>
+<body>
+
+<div class="room-container">
+    <h1>Player Room</h1>
+    <img src="images/icon.png" alt="icon" id="icon">
+
+    <!-- Room Code Display -->
+    <div class="room-code-container">
+        <input type="text" id="roomCodeDisplay" value="Loading..." readonly />
+        <button onclick="copyRoomCode()">Copy</button>
+        <p>copy code to invite friends</p>
+    </div>
+
+    <!-- Players List -->
+    <div class="players-list" id="playersList">
+        <!-- Players will be listed here -->
+    </div>
+
+    <!-- Admin Controls: Game Mode Selection -->
+    <div class="mode-container">
+        <button onclick="chooseMode('prompt')">Prompt Draw Mode</button>
+        <button onclick="chooseMode('memory')">Memory Draw Mode</button>
+    </div>
+</div>
+<div id="startGameModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeStartGameModal()">&times;</span>
+        <h2>Start Game</h2>
+        <p>You have selected <span id="selectedMode"></span> mode.</p>
+        <button id="startGameButton" onclick="startGame()">START</button>
+    </div>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomCode = urlParams.get('room'); // Get room code from URL
+
+    if (!roomCode) {
+        alert('Room code not found. Please join a valid room.');
+        window.location.href = 'index.html'; // Redirect to home page
+    } else {
+        fetchRoomDetails(); // Fetch room details if the room code is valid
+    }
+
+    // Fetch room details (room code and players) from the server
+    function fetchRoomDetails() {
+        fetch(`/getRoomDetails?room=${roomCode}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Display room code
+                    document.getElementById('roomCodeDisplay').value = data.roomCode;
+
+                    // Update players list
+                    const players = data.players;
+                    updatePlayerList(players);
+                } else {
+                    alert(data.error);
+                    window.location.href = 'index.html'; // Redirect to home page
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching room details:', error);
+                alert('Failed to fetch room details');
+                window.location.href = 'index.html'; // Redirect to home page
+            });
+    }
+
+    // Display players in the room
+    function updatePlayerList(players) {
+        const playerListElement = document.getElementById('playersList');
+        playerListElement.innerHTML = ""; // Clear current list
+
+        players.forEach(player => {
+            const playerElement = document.createElement('div');
+            playerElement.style.display = 'flex';
+            playerElement.style.alignItems = 'center';
+            playerElement.style.marginBottom = '10px';
+
+            // Display the character image
+            const characterImage = document.createElement('img');
+            characterImage.src = player.characterImage; // Use the character image path
+            characterImage.alt = player.character;
+            characterImage.style.width = '50px';
+            characterImage.style.height = '50px';
+            characterImage.style.marginRight = '10px';
+
+            // Display the player's name
+            const playerName = document.createElement('p');
+            playerName.textContent = player.name;
+
+            // Append the image and name to the player element
+            playerElement.appendChild(characterImage);
+            playerElement.appendChild(playerName);
+
+            // Append the player element to the player list
+            playerListElement.appendChild(playerElement);
+        });
+    }
+
+    // Copy room code to clipboard
+    function copyRoomCode() {
+        const roomCodeInput = document.getElementById('roomCodeDisplay');
+        roomCodeInput.select();
+        document.execCommand('copy');
+        alert('Room code copied to clipboard!');
+    }
+
+    // Handle mode selection (admin-only functionality)
+    function chooseMode(mode) {
+        // Display the selected mode in the modal
+        document.getElementById('selectedMode').textContent = mode;
+
+        // Show the modal
+        const modal = document.getElementById('startGameModal');
+        modal.style.display = 'block';
+    }
+
+    // Close the modal
+    function closeStartGameModal() {
+        const modal = document.getElementById('startGameModal');
+        modal.style.display = 'none';
+    }
+
+// Start the game
+function startGame() {
+    const mode = document.getElementById('selectedMode').textContent.trim();
+    //alert(`Starting game in ${mode} mode!`);
+    closeStartGameModal(); // Close the modal after starting the game
+
+    fetch(`/startGame`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ room: roomCode, mode }),
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            if (mode === 'memory') {
+                window.location.href = `memory.html?room=${roomCode}`;
+            } else {
+                window.location.href = `prompt.html?room=${roomCode}`;
+            }
+        } else {
+            alert('Failed to start the game: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error starting game:', error);
+        alert('Failed to start the game: ' + error.message);
+    });
+}
+
+    // Initialize room
+    if (roomCode) {
+        fetchRoomDetails();
+    } else {
+        alert('Room code not found. Please join a valid room.');
+        window.location.href = 'index.html'; // Redirect to home page
+    }
+    console.log('Starting game with room:', roomCode, 'and mode:', mode);
+</script>
+
+</body>
+</html>

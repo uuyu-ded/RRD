@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoundRobinDraw - Prompt</title>
+    <link rel="stylesheet" href="prompt.css">
+</head>
+<body>
+    <img src="images/icon.png" alt="RoundRobinDraw Logo" class="logo">
+    <div class="timer" id="timer">30</div>
+    <div class="container">
+        <img src="images/iconcry.png" alt="Prompt Icon" class="prompt-icon" width="100">
+        <h2 class="title">WRITE A PROMPT</h2>
+        <div class="prompt-box">
+            <input type="text" id="promptInput" placeholder="Draw a cat wearing a wizard hat">
+            <button class="done-btn" id="doneButton">DONE!</button>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+const roomCode = urlParams.get('room');
+
+let timeLeft = 20;
+const timerElement = document.getElementById("timer");
+const inputElement = document.getElementById("promptInput");
+const doneButton = document.getElementById("doneButton");
+
+doneButton.addEventListener("click", () => {
+    const prompt = inputElement.value;
+    if (prompt.trim() === "") {
+        alert("Please enter a valid prompt.");
+        return;
+    }
+
+    // Send the prompt to the server
+    fetch(`/submitPrompt`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ room: roomCode, prompt }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            inputElement.disabled = true;
+            doneButton.disabled = true;
+        } else {
+            alert('Failed to submit prompt.');
+        }
+    })
+    .catch(error => {
+        console.error('Error submitting prompt:', error);
+        alert('Failed to submit prompt.');
+    });
+});
+
+const countdown = setInterval(() => {
+    timeLeft--;
+    timerElement.textContent = timeLeft;
+    if (timeLeft <= 0) {
+        clearInterval(countdown);
+        inputElement.disabled = true;
+        doneButton.disabled = true;
+
+        //checking game before redirecting
+        fetch(`/getRoomDetails?room=${roomCode}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (data.mode === 'memory') {
+                    window.location.href = `memory.html?room=${roomCode}`;
+                } else {
+                    window.location.href = `canvas.html?room=${roomCode}`;
+                }
+            }
+        });
+    }
+}, 1000);
+    </script>
+</body>
+</html>

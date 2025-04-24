@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory Draw Mode</title>
+  <link rel="stylesheet" href="memory.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h2>Memorize These Drawings - Round <span id="roundDisplay">1</span></h2>
+  <div id="drawings-container"></div>
+  <div id="timer">Time left: 20s</div>
+
+  <script>
+    const socket = io();
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomCode = urlParams.get('room');
+    const viewing = urlParams.get('viewing') === 'true';
+    let viewTimeLeft = 20;
+
+    window.onload = () => {
+      if (!roomCode) {
+        window.location.href = 'index.html';
+        return;
+      }
+      
+      if (viewing) {
+        startViewingPhase();
+      } else {
+        window.location.href = `canvas.html?room=${roomCode}&mode=memory&round=1`;
+      }
+    };
+
+    function startViewingPhase() {
+      fetch(`/getDrawings?room=${roomCode}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            displayDrawings(data.drawings);
+            startViewTimer();
+          }
+        });
+    }
+
+    function displayDrawings(drawings) {
+      const container = document.getElementById('drawings-container');
+      container.innerHTML = '';
+      
+      Object.entries(drawings).forEach(([player, imgData]) => {
+        const img = document.createElement('img');
+        img.src = imgData;
+        img.className = 'drawing-to-memorize';
+        img.alt = `Drawing by ${player}`;
+        container.appendChild(img);
+      });
+    }
+
+    function startViewTimer() {
+      const timerElement = document.getElementById('timer');
+      const timer = setInterval(() => {
+        viewTimeLeft--;
+        timerElement.textContent = `Time left: ${viewTimeLeft}s`;
+        
+        if (viewTimeLeft <= 0) {
+          clearInterval(timer);
+          socket.emit('nextMemoryRound', { roomCode });
+        }
+      }, 1000);
+    }
+
+    // Socket listeners
+    socket.on('nextMemoryRound', ({ round }) => {
+      window.location.href = `canvas.html?room=${roomCode}&mode=memory&round=${round}`;
+    });
+
+    socket.on('memoryGameCompleted', () => {
+      alert("Memory game completed!");
+      window.location.href = `draw.html?room=${roomCode}`;
+    });
+  </script>
+</body>
+</html>

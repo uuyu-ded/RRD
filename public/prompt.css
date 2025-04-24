@@ -1,0 +1,76 @@
+body {
+    background: linear-gradient(to bottom, #b0e0a8, #d8f3dc);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: Arial, sans-serif;
+    color: #2e3d27;
+    text-align: center;
+    position: relative;
+}
+.logo {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 150px;
+}
+.timer {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 24px;
+    font-weight: bold;
+}
+.container {
+    position: relative;
+    width: 80%;
+    max-width: 600px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 15px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+.prompt-icon {
+    margin-bottom: 10px;
+}
+.prompt-box {
+    margin-top: 10px;
+    padding: 10px;
+    background: #fff;
+    border-radius: 10px;
+    border: 2px solid #2e3d27;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+input {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    outline: none;
+    text-align: center;
+}
+.done-btn {
+    padding: 10px 20px;
+    background: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 18px;
+    white-space: nowrap; /* Prevent button text from wrapping */
+}
+.done-btn:disabled {
+    background: gray;
+    cursor: not-allowed;
+}
+.title {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    font-size: 24px;
+    font-weight: bold;
+}

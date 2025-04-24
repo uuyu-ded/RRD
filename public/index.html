@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoundRobin Draw</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+<div class="container">
+    <h1>WELCOME</h1>
+    <img src="images/icon.png" alt="icon" id="icon">
+    <!-- Character Selection -->
+    <div class="character-select">
+        <label for="character">Choose your character:</label>
+        <div class="character-images">
+            <button onclick="changeCharacter('prev')">&lt;</button>
+            <img src="images/character1.png" alt="Character 1" id="character1" class="selected" />
+            <img src="images/character2.png" alt="Character 2" id="character2" />
+            <img src="images/character3.png" alt="Character 3" id="character3" />
+            <img src="images/character4.png" alt="Character 4" id="character4" />
+            <img src="images/character5.png" alt="Character 5" id="character5" />
+            <img src="images/character6.png" alt="Character 6" id="character6" />
+            <img src="images/character7.png" alt="Character 7" id="character7" />
+            <button onclick="changeCharacter('next')">&gt;</button>
+        </div>
+    </div>
+
+    <input type="text" id="playerName" placeholder="Enter your name" />
+    <div>
+        <button onclick="createRoom()" id="zzz">Create Room</button>
+    <button onclick="openJoinRoomModal()" id="zzz">Join Room</button>
+    </div>
+</div>
+
+<!-- Modal for Joining Room -->
+<div id="joinRoomModal" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="closeJoinRoomModal()">&times;</span>
+    <h2>Enter Room Code</h2>
+    <input type="text" id="roomCode" placeholder="Enter Room Code" />
+    <button onclick="joinRoom()">Join</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+
+<script src="app.js"></script>
+<script>
+    let selectedCharacterIndex = 0; // Track the currently selected character
+
+    const characters = [
+        'character1',
+        'character2',
+        'character3',
+        'character4',
+        'character5',
+        'character6',
+        'character7'
+    ];
+
+    // Function to show the selected character and hide others
+    function changeCharacter(direction) {
+        // Hide all images
+        characters.forEach(character => {
+            document.getElementById(character).classList.remove('selected');
+        });
+
+        // Update the index based on direction
+        if (direction === 'next') {
+            selectedCharacterIndex = (selectedCharacterIndex + 1) % characters.length;
+        } else if (direction === 'prev') {
+            selectedCharacterIndex = (selectedCharacterIndex - 1 + characters.length) % characters.length;
+        }
+
+        // Show the selected character
+        const selectedCharacter = characters[selectedCharacterIndex];
+        document.getElementById(selectedCharacter).classList.add('selected');
+    }
+
+    // Open Join Room Modal
+    function openJoinRoomModal() {
+        document.getElementById('joinRoomModal').style.display = "block";
+    }
+
+    // Close Join Room Modal
+    function closeJoinRoomModal() {
+        document.getElementById('joinRoomModal').style.display = "none";
+    }
+
+</script>
+
+</body>
+</html>
