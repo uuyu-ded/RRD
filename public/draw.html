@@ -151,7 +151,7 @@ function startGame() {
     })
     .then(data => {
         if (data.success) {
-            if (mode === 'memory') {
+            if (mode === 'copycat') {
                 window.location.href = `memory.html?room=${roomCode}`;
             } else {
                 window.location.href = `prompt.html?room=${roomCode}`;
