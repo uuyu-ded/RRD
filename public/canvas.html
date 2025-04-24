@@ -87,39 +87,124 @@
         .catch(error => {
             console.error('Error fetching prompt:', error);
         });
-}
+        }
         
         const canvas = document.getElementById("drawingCanvas");
         const ctx = canvas.getContext("2d");
-        let painting = false;
-        let tool = "brush";
-        let color = "#000000";
-        let size = 5;
-        let startX, startY, endX, endY;
-        let timer = 160;
-        let isDrawingShape = false;
-        let shapes = [];
-        let freehandPaths = [];
-
-        // History for undo/redo
-        let history = [];
-        let currentHistoryIndex = -1;
+        let painting = false, tool = "brush", color = "#000000", size = 5;
+        let startX, startY, endX, endY, timer = 160, isDrawingShape = false;
+        let freehandPaths = [], shapes = [];
+        let history = [], currentHistoryIndex = -1;
+        let actionSequence = 0;
 
         function saveState() {
-            // Remove future states if we undo and then perform a new action
-            if (currentHistoryIndex < history.length - 1) {
-                history.splice(currentHistoryIndex + 1);
-            }
-            // Save the current state
-            history.push({
-                freehandPaths: JSON.parse(JSON.stringify(freehandPaths)),
-                shapes: JSON.parse(JSON.stringify(shapes))
-            });
-            currentHistoryIndex = history.length - 1;
-            updateUndoRedoButtons();
+            if (currentHistoryIndex < history.length - 1) history.splice(currentHistoryIndex + 1);
+            history.push({ freehandPaths: JSON.parse(JSON.stringify(freehandPaths)), shapes: JSON.parse(JSON.stringify(shapes)), actionSequence });
+            currentHistoryIndex = history.length - 1; updateUndoRedoButtons();
         }
 
-    if (isMemoryMode) {
+        function undo() {
+            if (currentHistoryIndex >= 0) {
+                currentHistoryIndex--;
+                if (currentHistoryIndex >= 0) {
+                    const st = history[currentHistoryIndex]; freehandPaths = JSON.parse(JSON.stringify(st.freehandPaths)); shapes = JSON.parse(JSON.stringify(st.shapes)); actionSequence = st.actionSequence;
+                } else { freehandPaths = []; shapes = []; actionSequence = 0; }
+                redrawCanvas(); updateUndoRedoButtons();
+            }
+        }
+
+        function redo() {
+            if (currentHistoryIndex < history.length - 1) {
+                currentHistoryIndex++;
+                const st = history[currentHistoryIndex]; freehandPaths = JSON.parse(JSON.stringify(st.freehandPaths)); shapes = JSON.parse(JSON.stringify(st.shapes)); actionSequence = st.actionSequence;
+                redrawCanvas(); updateUndoRedoButtons();
+            }
+        }
+
+        function updateUndoRedoButtons() {
+            document.getElementById("undoButton").disabled = currentHistoryIndex < 0;
+            document.getElementById("redoButton").disabled = currentHistoryIndex >= history.length - 1;
+        }
+
+        function setTool(t) { tool = t; }
+        function setColor(c) { color = c; }
+        function setSize(s) { size = s; }
+
+        function startPosition(e) {
+            if (timer <= 0) return;
+            painting = true;
+            startX = e.clientX - canvas.getBoundingClientRect().left;
+            startY = e.clientY - canvas.getBoundingClientRect().top;
+            if (tool === 'brush' || tool === 'eraser') {
+                freehandPaths.push({ type: 'freehand', points: [{ x: startX, y: startY }], color: tool==='eraser'? '#FFFFFF': color, size, seq: actionSequence++ });
+            } else isDrawingShape = true;
+        }
+
+        function endPosition() {
+            if (isDrawingShape) {
+                if (tool==='rectangle') shapes.push({ type: 'rectangle', x: startX, y: startY, width: endX-startX, height: endY-startY, color, size, seq: actionSequence++ });
+                else if (tool==='circle') {
+                    const radius=Math.hypot(endX-startX,endY-startY);
+                    shapes.push({ type:'circle', x:startX, y:startY, radius, color, size, seq: actionSequence++ });
+                }
+                isDrawingShape=false;
+            }
+            painting=false; ctx.beginPath(); saveState();
+        }
+
+        function draw(e) {
+            if (!painting) return;
+            const x = e.clientX - canvas.getBoundingClientRect().left;
+            const y = e.clientY - canvas.getBoundingClientRect().top;
+            if (tool==='brush'||tool==='eraser') {
+                const path = freehandPaths[freehandPaths.length-1]; path.points.push({ x, y });
+                ctx.strokeStyle = path.color; ctx.lineWidth=path.size; ctx.lineCap="round";
+                ctx.lineTo(x,y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x,y);
+            } else { endX=x; endY=y; drawShapePreview(); }
+        }
+
+        function drawShapePreview() {
+            if (!isDrawingShape) return; redrawCanvas(); ctx.strokeStyle=color; ctx.lineWidth=size;
+            if (tool==='rectangle') ctx.strokeRect(startX,startY,endX-startX,endY-startY);
+            else { ctx.beginPath(); ctx.arc(startX,startY,Math.hypot(endX-startX,endY-startY),0,2*Math.PI); ctx.stroke(); }
+        }
+
+        function redrawCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const all = [...freehandPaths, ...shapes].sort((a,b)=>a.seq-b.seq);
+            all.forEach(obj=>{
+                if (obj.type==='freehand') {
+                    ctx.strokeStyle=obj.color; ctx.lineWidth=obj.size; ctx.lineCap="round"; ctx.beginPath();
+                    obj.points.forEach((pt,i)=>{ if(i===0) ctx.moveTo(pt.x,pt.y); else ctx.lineTo(pt.x,pt.y); }); ctx.stroke();
+                } else if(obj.type==='rectangle') {
+                    ctx.strokeStyle=obj.color; ctx.lineWidth=obj.size; ctx.strokeRect(obj.x,obj.y,obj.width,obj.height);
+                } else if(obj.type==='circle') {
+                    ctx.strokeStyle=obj.color; ctx.lineWidth=obj.size; ctx.beginPath(); ctx.arc(obj.x,obj.y,obj.radius,0,2*Math.PI); ctx.stroke();
+                }
+            });
+        }
+
+        function clearCanvas() { ctx.clearRect(0,0,canvas.width,canvas.height); freehandPaths=[]; shapes=[]; actionSequence=0; saveState(); }
+        function submitDrawing(){alert("Drawing submitted!");}
+        function startTimer(){ 
+            const timerEl=document.getElementById("timer"); 
+            const countdown=setInterval(()=>{ 
+                if(timer>0){timer--;timerEl.textContent=`Time: ${timer}s`; 
+
+                } else {
+                    clearInterval(countdown);
+                    alert("Time's up!");[...document.querySelectorAll('button,input')].forEach(el=>{if(el.id!=='submitButton')el.disabled=true;
+
+                    });
+                }
+            },1000);
+        }        
+        canvas.addEventListener("mousedown",startPosition);
+        canvas.addEventListener("mouseup",endPosition);
+        canvas.addEventListener("mousemove",draw);
+        startTimer();
+
+if (isMemoryMode) {
     // Adjust timer for memory mode
     timer = 120; // 1 minute for memory mode drawing
     
@@ -160,209 +245,6 @@
             }
         }, 1000);
     }
-
-        function undo() {
-            if (currentHistoryIndex >= 0) { // Allow undoing the first action
-                currentHistoryIndex--;
-                if (currentHistoryIndex >= 0) {
-                    const state = history[currentHistoryIndex];
-                    freehandPaths = JSON.parse(JSON.stringify(state.freehandPaths));
-                    shapes = JSON.parse(JSON.stringify(state.shapes));
-                } else {
-                    // Reset to the initial state
-                    freehandPaths = [];
-                    shapes = [];
-                }
-                redrawCanvas();
-                updateUndoRedoButtons();
-            }
-        }
-
-        function redo() {
-            if (currentHistoryIndex < history.length - 1) {
-                currentHistoryIndex++;
-                const state = history[currentHistoryIndex];
-                freehandPaths = JSON.parse(JSON.stringify(state.freehandPaths));
-                shapes = JSON.parse(JSON.stringify(state.shapes));
-                redrawCanvas();
-                updateUndoRedoButtons();
-            }
-        }
-
-        function updateUndoRedoButtons() {
-            const undoButton = document.getElementById("undoButton");
-            const redoButton = document.getElementById("redoButton");
-            undoButton.disabled = currentHistoryIndex < 0; // Disable undo if no history
-            redoButton.disabled = currentHistoryIndex >= history.length - 1; // Disable redo if at the latest state
-        }
-
-        function setTool(selectedTool) {
-            tool = selectedTool;
-        }
-
-        function setColor(newColor) {
-            color = newColor;
-        }
-
-        function setSize(newSize) {
-            size = newSize;
-        }
-
-        function startPosition(e) {
-            if (timer <= 0) return; // Disable drawing if timer is up
-            painting = true;
-            startX = e.clientX - canvas.getBoundingClientRect().left;
-            startY = e.clientY - canvas.getBoundingClientRect().top;
-
-            if (tool === 'brush' || tool === 'eraser') {
-                // Start a new freehand path
-                freehandPaths.push({
-                    type: 'freehand',
-                    points: [{ x: startX, y: startY }],
-                    color: tool === 'eraser' ? '#FFFFFF' : color, // Eraser uses white color
-                    size: size
-                });
-            } else if (tool === 'rectangle' || tool === 'circle') {
-                isDrawingShape = true; // Start drawing a shape
-            }
-        }
-
-        function endPosition() {
-            if (isDrawingShape) {
-                // Finalize the shape
-                if (tool === 'rectangle') {
-                    shapes.push({ type: 'rectangle', x: startX, y: startY, width: endX - startX, height: endY - startY, color, size });
-                } else if (tool === 'circle') {
-                    const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-                    shapes.push({ type: 'circle', x: startX, y: startY, radius, color, size });
-                }
-                isDrawingShape = false; // Stop drawing the shape
-            }
-            painting = false;
-            ctx.beginPath();
-
-            // Save the current state to history
-            saveState();
-        }
-
-        function draw(e) {
-            if (!painting) return;
-
-            const x = e.clientX - canvas.getBoundingClientRect().left;
-            const y = e.clientY - canvas.getBoundingClientRect().top;
-
-            if (tool === 'brush' || tool === 'eraser') {
-                // Add the current point to the latest freehand path
-                freehandPaths[freehandPaths.length - 1].points.push({ x, y });
-
-                // Draw the brush or eraser in real-time
-                ctx.strokeStyle = tool === 'eraser' ? '#FFFFFF' : color; // Eraser uses white color
-                ctx.lineWidth = size;
-                ctx.lineCap = "round";
-                ctx.lineTo(x, y);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(x, y);
-            } else if (tool === 'rectangle' || tool === 'circle') {
-                // For shapes, just update the preview
-                endX = x;
-                endY = y;
-                drawShapePreview();
-            }
-        }
-
-        function drawShapePreview() {
-            if (!isDrawingShape) return;
-
-            // Redraw the canvas with existing shapes and freehand paths
-            redrawCanvas();
-
-            // Draw the preview shape
-            ctx.strokeStyle = color;
-            ctx.lineWidth = size;
-            if (tool === 'rectangle') {
-                ctx.strokeRect(startX, startY, endX - startX, endY - startY);
-            } else if (tool === 'circle') {
-                const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-                ctx.beginPath();
-                ctx.arc(startX, startY, radius, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-        }
-
-        function redrawCanvas() {
-            // Clear the canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Redraw all freehand paths
-            freehandPaths.forEach(path => {
-                ctx.strokeStyle = path.color;
-                ctx.lineWidth = path.size;
-                ctx.lineCap = "round";
-                ctx.beginPath();
-                path.points.forEach((point, index) => {
-                    if (index === 0) {
-                        ctx.moveTo(point.x, point.y);
-                    } else {
-                        ctx.lineTo(point.x, point.y);
-                    }
-                });
-                ctx.stroke();
-            });
-
-            // Redraw all finalized shapes
-            shapes.forEach(shape => {
-                ctx.strokeStyle = shape.color;
-                ctx.lineWidth = shape.size;
-                if (shape.type === 'rectangle') {
-                    ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
-                } else if (shape.type === 'circle') {
-                    ctx.beginPath();
-                    ctx.arc(shape.x, shape.y, shape.radius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-            });
-        }
-
-        function clearCanvas() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            shapes = []; // Clear the shapes array
-            freehandPaths = []; // Clear the freehand paths array
-            saveState(); // Save the cleared state
-        }
-
-        function submitDrawing() {
-            alert("Drawing submitted!");
-        }
-
-        function startTimer() {
-            const timerElement = document.getElementById("timer");
-            const countdown = setInterval(() => {
-                if (timer > 0) {
-                    timer--;
-                    timerElement.textContent = `Time: ${timer}s`;
-                } else {
-                    clearInterval(countdown);
-                    alert("Time's up!");
-                    // Disable all buttons except the Submit button
-                    brushButton.disabled = true;
-                    eraserButton.disabled = true;
-                    rectangleButton.disabled = true;
-                    circleButton.disabled = true;
-                    clearButton.disabled = true;
-                    colorPicker.disabled = true;
-                    brushSize.disabled = true;
-                    undoButton.disabled = true;
-                    redoButton.disabled = true;
-                }
-            }, 1000);
-        }
-
-        canvas.addEventListener("mousedown", startPosition);
-        canvas.addEventListener("mouseup", endPosition);
-        canvas.addEventListener("mousemove", draw);
-
-        startTimer();
     </script>
 </body>
 </html>

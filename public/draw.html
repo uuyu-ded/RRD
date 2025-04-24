@@ -26,15 +26,15 @@
 
     <!-- Admin Controls: Game Mode Selection -->
     <div class="mode-container">
-        <button onclick="chooseMode('prompt')">Prompt Draw Mode</button>
-        <button onclick="chooseMode('memory')">Memory Draw Mode</button>
+        <button onclick="chooseMode('prompt')">Prompt Mode</button>
+        <button onclick="chooseMode('copycat')">Copycat Mode</button>
     </div>
 </div>
 <div id="startGameModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeStartGameModal()">&times;</span>
         <h2>Start Game</h2>
-        <p>You have selected <span id="selectedMode"></span> mode.</p>
+        <p>You are starting <span id="selectedMode"></span> mode.</p>
         <button id="startGameButton" onclick="startGame()">START</button>
     </div>
 </div>

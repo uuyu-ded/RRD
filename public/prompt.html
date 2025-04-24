@@ -15,70 +15,97 @@
         <div class="prompt-box">
             <input type="text" id="promptInput" placeholder="Draw a cat wearing a wizard hat">
             <button class="done-btn" id="doneButton">DONE!</button>
+            <button class="edit-btn" id="editButton">EDIT</button>
         </div>
     </div>
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-const roomCode = urlParams.get('room');
+        const roomCode = urlParams.get('room');
+        let submittedPrompt = "";
 
-let timeLeft = 20;
-const timerElement = document.getElementById("timer");
-const inputElement = document.getElementById("promptInput");
-const doneButton = document.getElementById("doneButton");
+        let timeLeft = 20;
+        const timerElement = document.getElementById("timer");
+        const inputElement = document.getElementById("promptInput");
+        const doneButton = document.getElementById("doneButton");
+        const editButton = document.getElementById("editButton");
 
-doneButton.addEventListener("click", () => {
-    const prompt = inputElement.value;
-    if (prompt.trim() === "") {
-        alert("Please enter a valid prompt.");
-        return;
-    }
+        doneButton.addEventListener("click", () => {
+            const prompt = inputElement.value.trim();
+            if (prompt === "") {
+                alert("Please enter a valid prompt.");
+                return;
+            }
 
-    // Send the prompt to the server
-    fetch(`/submitPrompt`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ room: roomCode, prompt }),
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
+            submittedPrompt = prompt;
+            submitPrompt(prompt);
             inputElement.disabled = true;
             doneButton.disabled = true;
-        } else {
-            alert('Failed to submit prompt.');
-        }
-    })
-    .catch(error => {
-        console.error('Error submitting prompt:', error);
-        alert('Failed to submit prompt.');
-    });
-});
-
-const countdown = setInterval(() => {
-    timeLeft--;
-    timerElement.textContent = timeLeft;
-    if (timeLeft <= 0) {
-        clearInterval(countdown);
-        inputElement.disabled = true;
-        doneButton.disabled = true;
-
-        //checking game before redirecting
-        fetch(`/getRoomDetails?room=${roomCode}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                if (data.mode === 'memory') {
-                    window.location.href = `memory.html?room=${roomCode}`;
-                } else {
-                    window.location.href = `canvas.html?room=${roomCode}`;
-                }
-            }
+            doneButton.style.display = 'none'; // hide DONE!
+            editButton.style.display = 'inline-block'; // show EDIT
         });
-    }
-}, 1000);
+
+        editButton.addEventListener("click", () => {
+            // Enable editing
+            inputElement.disabled = false;
+            inputElement.focus();
+            doneButton.disabled = false;
+            doneButton.style.display = 'inline-block';
+            editButton.style.display = 'none';
+        });
+
+        function submitPrompt(prompt) {
+            // Send the prompt to the server
+            fetch(`/submitPrompt`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ room: roomCode, prompt }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    inputElement.disabled = true;
+                    doneButton.disabled = true;
+                    editButton.style.display = 'inline-block'; // Show edit button
+                } else {
+                    alert('Failed to submit prompt.');
+                    inputElement.disabled = false;
+                    doneButton.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error submitting prompt:', error);
+                alert('Failed to submit prompt.');
+                inputElement.disabled = false;
+                doneButton.disabled = false;
+            });
+        }
+
+        const countdown = setInterval(() => {
+            timeLeft--;
+            timerElement.textContent = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(countdown);
+                inputElement.disabled = true;
+                doneButton.disabled = true;
+                editButton.style.display = 'none';
+
+                //checking game before redirecting
+                fetch(`/getRoomDetails?room=${roomCode}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.mode === 'memory') {
+                            window.location.href = `memory.html?room=${roomCode}`;
+                        } else {
+                            window.location.href = `canvas.html?room=${roomCode}`;
+                        }
+                    }
+                });
+            }
+        }, 1000);
     </script>
 </body>
 </html>
