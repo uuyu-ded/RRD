@@ -7,6 +7,42 @@
     <link rel="stylesheet" href="index.css">
 </head>
 <body>
+<div class="whole">
+    <div class="slideshow-container">
+        <div class="slide active">
+            <h3>How to Play</h3>
+            <p>Welcome to RoundRobin Draw! Here's how to get started:</p>
+            <p>1. Choose your character</p>
+            <p>2. Enter your player name</p>
+        </div>
+        
+        <div class="slide">
+            <h3>Creating a Room</h3>
+            <p>Click "Create Room" to start a new game session.</p>
+            <p>You'll receive a room code to share with friends.</p>
+        </div>
+        
+        <div class="slide">
+            <h3>Joining a Room</h3>
+            <p>Click "Join Room" and enter the room code provided by the host.</p>
+            <p>Make sure all players join before starting the game.</p>
+        </div>
+        
+        <div class="slide">
+            <h3>Game Rules</h3>
+            <p>Players take turns drawing based on prompts.</p>
+            <p>Each round has a time limit - be quick!</p>
+            <p>Have fun and be creative!</p>
+        </div>
+        
+        <div class="slide-indicators">
+            <span class="indicator active" onclick="goToSlide(0)"></span>
+            <span class="indicator" onclick="goToSlide(1)"></span>
+            <span class="indicator" onclick="goToSlide(2)"></span>
+            <span class="indicator" onclick="goToSlide(3)"></span>
+        </div>
+    </div>
+
 
 <div class="container">
     <h1>WELCOME</h1>
@@ -42,6 +78,7 @@
     <input type="text" id="roomCode" placeholder="Enter Room Code" />
     <button onclick="joinRoom()">Join</button>
   </div>
+</div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -88,6 +125,43 @@
     function closeJoinRoomModal() {
         document.getElementById('joinRoomModal').style.display = "none";
     }
+
+    //slideshow's script
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const indicators = document.querySelectorAll('.indicator');
+
+    function showSlide(n) {
+        // Hide all slides
+        slides.forEach(slide => {
+            slide.classList.remove('active');
+        });
+        
+        // Remove active class from all indicators
+        indicators.forEach(indicator => {
+            indicator.classList.remove('active');
+        });
+        
+        // Show the selected slide
+        currentSlide = (n + slides.length) % slides.length;
+        slides[currentSlide].classList.add('active');
+        indicators[currentSlide].classList.add('active');
+    }
+
+    function nextSlide() {
+        showSlide(currentSlide + 1);
+    }
+
+    function prevSlide() {
+        showSlide(currentSlide - 1);
+    }
+
+    function goToSlide(n) {
+        showSlide(n);
+    }
+
+    //Auto-advances slide every 5 seconds
+    setInterval(nextSlide, 5000);
 
 </script>
 
