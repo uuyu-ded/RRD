@@ -276,29 +276,55 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('joinRoom', async ({ roomCode, playerName, selectedCharacter, selectedCharacterImage }) => {
-        if (!roomCode || !playerName || !selectedCharacter || !selectedCharacterImage) {
-            socket.emit('roomError', 'Room code, player name, character, and character image are required!');
-            return;
+    socket.on('joinRoom', async ({ roomCode, playerName, selectedCharacter, selectedCharacterImage }, callback) => {
+        try {
+            if (!roomCode || !playerName || !selectedCharacter || !selectedCharacterImage) {
+                callback({ success: false, error: 'All fields are required!' });
+                return;
+            }
+    
+            const room = await Room.findOne({ roomCode });
+            if (!room) {
+                callback({ success: false, error: 'Room does not exist!' });
+                return;
+            }
+    
+            if (room.players.some(player => player.name === playerName)) {
+                callback({ success: false, error: 'Player already in room!' });
+                return;
+            }
+    
+            // Adds the player to the room
+            const newPlayer = { 
+                name: playerName, 
+                character: selectedCharacter, 
+                characterImage: selectedCharacterImage 
+            };
+            room.players.push(newPlayer);
+            await room.save();
+    
+            // Joins the socket.io room
+            socket.join(roomCode);
+            socket.playerName = playerName;
+            
+            // Notifies the joining player
+            callback({ success: true, room });
+            
+            // Notifies all other players in the room
+            io.to(roomCode).emit('playerJoined', newPlayer);
+            
+            // Updates the player list for everyone
+            io.to(roomCode).emit('roomUpdated', room);
+    
+        } catch (error) {
+            console.error('Error joining room:', error);
+            callback({ success: false, error: 'Error joining room' });
         }
-
-        const room = await Room.findOne({ roomCode });
-        if (!room) {
-            socket.emit('roomError', 'Room does not exist!');
-            return;
-        }
-
-        if (room.players.some(player => player.name === playerName)) {
-            socket.emit('roomError', 'Player already in room!');
-            return;
-        }
-
-        // Add the player and their selected character to the room
-        room.players.push({ name: playerName, character: selectedCharacter, characterImage: selectedCharacterImage });
-        await room.save();
-
-        socket.emit('roomJoined', room);
-        socket.join(roomCode); // Join the room
+    });
+    
+    socket.on('joinSocketRoom', (roomCode) => {
+        socket.join(roomCode);
+        console.log(`Player joined socket room: ${roomCode}`);
     });
 
     socket.on('startMemoryGame', async ({ roomCode }) => {

@@ -11,7 +11,7 @@ function createRoom() {
         return;
     }
 
-    // Emit the createRoom event to the server
+    // Emits the createRoom event to the server
     socket.emit('createRoom', { playerName, roomCode, selectedCharacter, selectedCharacterImage });
 }
 
@@ -26,12 +26,44 @@ function joinRoom() {
         return;
     }
 
-    // Emit the joinRoom event to the server
-    socket.emit('joinRoom', { roomCode, playerName, selectedCharacter, selectedCharacterImage });
-    closeJoinRoomModal(); // Close the modal after joining the room
+    // Emits the joinRoom event to the server
+    socket.emit('joinRoom', { 
+        roomCode, 
+        playerName, 
+        selectedCharacter, 
+        selectedCharacterImage 
+    }, (response) => {
+        if (response.success) {
+            window.location.href = `draw.html?room=${roomCode}`;
+        } else {
+            alert(response.error || 'Failed to join room');
+        }
+    });
+    
+    closeJoinRoomModal();
 }
 
-// Listen for room creation success
+socket.on('roomJoined', (room) => {
+    // Updates the player list for everyone in the room
+    updatePlayerList(room.players);
+});
+
+socket.on('playerJoined', (player) => {
+    // Adds the new player to the list
+    const playersList = document.getElementById('playersList');
+    const playerElement = document.createElement('div');
+    playerElement.innerHTML = `
+        <img src="${player.characterImage}" alt="${player.character}" style="width:50px;height:50px;margin-right:10px;">
+        <p>${player.name}</p>
+    `;
+    playerElement.style.display = 'flex';
+    playerElement.style.alignItems = 'center';
+    playerElement.style.marginBottom = '10px';
+    playersList.appendChild(playerElement);
+});
+
+
+// Listens for room creation success
 socket.on('roomCreated', (room) => {
     //alert('Room created with code: ' + room.roomCode);
     // Redirect to the room page with the room code in the URL
@@ -59,7 +91,7 @@ socket.on('nextMemoryRound', ({ round, playerOrder }) => {
 });
 
 socket.on('memoryGameCompleted', () => {
-    alert("Memory game completed!");
+    //alert("Memory game completed!");
     window.location.href = `draw.html?room=${roomCode}`;
 });
 

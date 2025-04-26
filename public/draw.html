@@ -43,6 +43,26 @@
     const urlParams = new URLSearchParams(window.location.search);
     const roomCode = urlParams.get('room'); // Get room code from URL
 
+    //listening for room updates
+    socket.on('roomUpdated', (room) => {
+    updatePlayerList(room.players);
+    });
+
+    // Initializes socket connection and room when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+    // Gets room code from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomCode = urlParams.get('room');
+    
+    if (roomCode) {
+        // Join the socket.io room
+        socket.emit('joinSocketRoom', roomCode);
+        
+        // Fetches initial room state
+        fetchRoomDetails();
+    }
+    });
+
     if (!roomCode) {
         alert('Room code not found. Please join a valid room.');
         window.location.href = 'index.html'; // Redirect to home page
