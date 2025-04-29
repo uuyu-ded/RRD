@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guess the Prompt</title>
+    <link rel="stylesheet" href="guess.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Guess the Prompt</h1>
+        <div id="drawing-container">
+            <img id="drawing-to-guess" src="" alt="Drawing to guess">
+        </div>
+        <div class="input-area">
+            <textarea id="guessInput" placeholder="What do you think the original prompt was?"></textarea>
+            <button id="submitGuess">Submit Guess</button>
+        </div>
+        <div id="timer">Time left: 60s</div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomCode = urlParams.get('room');
+        const socket = io();
+        let timeLeft = 60;
+        let timerInterval;
+
+        socket.on('connect', () => {
+            socket.emit('joinSocketRoom', roomCode);
+        });
+
+        socket.on('startGuessing', ({ prompts }) => {
+            // Display the drawing assigned to this player
+            const playerName = "currentPlayerName"; // You'll need to get this from somewhere
+            const drawingUrl = prompts[playerName];
+            document.getElementById('drawing-to-guess').src = drawingUrl;
+            
+            // Start the timer
+            startTimer();
+        });
+
+        document.getElementById('submitGuess').addEventListener('click', () => {
+            const guess = document.getElementById('guessInput').value.trim();
+            if (!guess) {
+                alert('Please enter your guess');
+                return;
+            }
+
+            const playerName = "currentPlayerName"; // You'll need to get this from somewhere
+            socket.emit('submitGuess', { 
+                roomCode, 
+                guess, 
+                playerName 
+            }, (response) => {
+                if (response.success) {
+                    document.getElementById('guessInput').disabled = true;
+                    document.getElementById('submitGuess').disabled = true;
+                } else {
+                    alert('Failed to submit guess: ' + (response.error || 'Unknown error'));
+                }
+            });
+        });
+
+        socket.on('showResults', ({ results }) => {
+            // Display the results to the player
+            clearInterval(timerInterval);
+            alert('Game completed! Here are the results...');
+            // You might want to create a more sophisticated results display
+            window.location.href = `results.html?room=${roomCode}`;
+        });
+
+        function startTimer() {
+            const timerElement = document.getElementById('timer');
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerElement.textContent = `Time left: ${timeLeft}s`;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('guessInput').disabled = true;
+                    document.getElementById('submitGuess').disabled = true;
+                    // Auto-submit if time runs out
+                    document.getElementById('submitGuess').click();
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

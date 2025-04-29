@@ -1,52 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Player Room</title>
-    <link rel="stylesheet" href="draw.css">
-</head>
-<body>
-
-<div class="room-container">
-    <h1>Player Room</h1>
-    <img src="images/icon.png" alt="icon" id="icon">
-
-    <!-- Room Code Display -->
-    <div class="room-code-container">
-        <input type="text" id="roomCodeDisplay" value="Loading..." readonly />
-        <button onclick="copyRoomCode()">Copy</button>
-        <p>copy code to invite friends</p>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Fun Drawing Game Room</title>
+        <link rel="stylesheet" href="draw.css">
+        <link href="https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap" rel="stylesheet">
+    </head>
+    <body>
+    
+    <div class="room-container">
+        <img src="images/icon.png" alt="Game Icon" id="icon">
+        <h1>✨ Fun Drawing Room ✨</h1>
+    
+        <!-- Room Code Display -->
+        <div class="room-code-container">
+            <input type="text" id="roomCodeDisplay" value="Loading..." readonly />
+            <button onclick="copyRoomCode()">Copy Code</button>
+            <p>✉️ Share this code with friends to invite them!</p>
+        </div>
+    
+        <!-- Players List -->
+        <div class="players-list" id="playersList">
+            <!-- Players will be listed here -->
+            <div class="empty-message">Waiting for players to join...</div>
+        </div>
+    
+        <!-- Admin Controls: Game Mode Selection -->
+        <div class="mode-container">
+            <button onclick="chooseMode('prompt')">🎨 Prompt Mode</button>
+            <button onclick="chooseMode('copycat')">🐱 Copycat Mode</button>
+        </div>
     </div>
-
-    <!-- Players List -->
-    <div class="players-list" id="playersList">
-        <!-- Players will be listed here -->
+    
+    <!-- Start Game Modal -->
+    <div id="startGameModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeStartGameModal()">&times;</span>
+            <h2>🎮 Start Game! 🎮</h2>
+            <p>You are starting <span id="selectedMode" style="font-weight: bold;"></span> mode.</p>
+            <p>Ready to have fun?</p>
+            <button id="startGameButton" onclick="startGame()">LET'S GO!</button>
+        </div>
     </div>
-
-    <!-- Admin Controls: Game Mode Selection -->
-    <div class="mode-container">
-        <button onclick="chooseMode('prompt')">Prompt Mode</button>
-        <button onclick="chooseMode('copycat')">Copycat Mode</button>
-    </div>
-</div>
-<div id="startGameModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeStartGameModal()">&times;</span>
-        <h2>Start Game</h2>
-        <p>You are starting <span id="selectedMode"></span> mode.</p>
-        <button id="startGameButton" onclick="startGame()">START</button>
-    </div>
-</div>
+    
+    <!-- Confetti Effect for Game Start -->
+    <canvas id="confetti-canvas" style="position: fixed; top: 0; left: 0; pointer-events: none; z-index: 100; width: 100%; height: 100%; display: none;"></canvas>
 
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const roomCode = urlParams.get('room'); // Get room code from URL
 
     //listening for room updates
-    socket.on('roomUpdated', (room) => {
-    updatePlayerList(room.players);
-    });
+    //socket.on('roomUpdated', (room) => {
+    //updatePlayerList(room.players);
+    //});
 
     // Initializes socket connection and room when page loads
     document.addEventListener('DOMContentLoaded', () => {
@@ -96,48 +104,77 @@
 
     // Display players in the room
     function updatePlayerList(players) {
-        const playerListElement = document.getElementById('playersList');
-        playerListElement.innerHTML = ""; // Clear current list
+    const playerListElement = document.getElementById('playersList');
+    playerListElement.innerHTML = ""; // Clear current list
 
-        players.forEach(player => {
-            const playerElement = document.createElement('div');
-            playerElement.style.display = 'flex';
-            playerElement.style.alignItems = 'center';
-            playerElement.style.marginBottom = '10px';
-
-            // Display the character image
-            const characterImage = document.createElement('img');
-            characterImage.src = player.characterImage; // Use the character image path
-            characterImage.alt = player.character;
-            characterImage.style.width = '50px';
-            characterImage.style.height = '50px';
-            characterImage.style.marginRight = '10px';
-
-            // Display the player's name
-            const playerName = document.createElement('p');
-            playerName.textContent = player.name;
-
-            // Append the image and name to the player element
-            playerElement.appendChild(characterImage);
-            playerElement.appendChild(playerName);
-
-            // Append the player element to the player list
-            playerListElement.appendChild(playerElement);
-        });
+    if (players.length === 0) {
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'empty-message';
+        emptyMessage.textContent = 'Waiting for players to join...';
+        playerListElement.appendChild(emptyMessage);
+        return;
     }
+
+    players.forEach(player => {
+        const playerElement = document.createElement('div');
+        playerElement.style.display = 'flex';
+        playerElement.style.alignItems = 'center';
+        playerElement.style.marginBottom = '10px';
+
+        // Display the character image - use player.character.image instead of player.characterImage
+        const characterImage = document.createElement('img');
+        characterImage.src = player.character.image; // Changed from characterImage to character.image
+        characterImage.alt = player.character.name;
+        characterImage.style.width = '50px';
+        characterImage.style.height = '50px';
+        characterImage.style.marginRight = '10px';
+
+        // Display the player's name
+        const playerName = document.createElement('p');
+        playerName.textContent = player.name;
+
+        // Append the image and name to the player element
+        playerElement.appendChild(characterImage);
+        playerElement.appendChild(playerName);
+
+        // Append the player element to the player list
+        playerListElement.appendChild(playerElement);
+    });
+}
 
     // Copy room code to clipboard
     function copyRoomCode() {
         const roomCodeInput = document.getElementById('roomCodeDisplay');
         roomCodeInput.select();
         document.execCommand('copy');
-        alert('Room code copied to clipboard!');
+        const successMessage = document.createElement('div');
+        successMessage.textContent = '✅ Copied!';
+        successMessage.style.position = 'fixed';
+        successMessage.style.top = '20px';
+        successMessage.style.left = '50%';
+        successMessage.style.transform = 'translateX(-50%)';
+        successMessage.style.backgroundColor = '#4CAF50';
+        successMessage.style.color = 'white';
+        successMessage.style.padding = '10px 20px';
+        successMessage.style.borderRadius = '20px';
+        successMessage.style.zIndex = '1000';
+        document.body.appendChild(successMessage);
+
+        setTimeout(() => {
+            document.body.removeChild(successMessage);
+        }, 2000);
     }
 
     // Handle mode selection (admin-only functionality)
     function chooseMode(mode) {
-        // Display the selected mode in the modal
-        document.getElementById('selectedMode').textContent = mode;
+        const selectedModeElement = document.getElementById('selectedMode');
+        if (mode === 'prompt') {
+            selectedModeElement.textContent = '🎨 Prompt Mode';
+            selectedModeElement.style.color = '#1976d2';
+        } else {
+            selectedModeElement.textContent = '🐱 Copycat Mode';
+            selectedModeElement.style.color = '#388e3c';
+        }
 
         // Show the modal
         const modal = document.getElementById('startGameModal');
@@ -152,8 +189,10 @@
 
 // Start the game
 function startGame() {
-    const mode = document.getElementById('selectedMode').textContent.trim();
+    const mode = document.getElementById('selectedMode').
+    textContent.includes('Prompt') ? 'prompt' : 'copycat';
     //alert(`Starting game in ${mode} mode!`);
+    showConfetti();
     closeStartGameModal(); // Close the modal after starting the game
 
     fetch(`/startGame`, {
@@ -184,8 +223,67 @@ function startGame() {
         console.error('Error starting game:', error);
         alert('Failed to start the game: ' + error.message);
     });
+
+    setTimeout(() => {
+            closeStartGameModal();
+            alert(`Game starting in ${mode} mode! In a real app, you would be redirected to the game page.`);
+        }, 2000);
 }
 
+function showConfetti() {
+        const canvas = document.getElementById('confetti-canvas');
+        canvas.style.display = 'block';
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        const pieces = [];
+        const colors = ['#ffb74d', '#64b5f6', '#81c784', '#f8bbd0', '#e1bee7'];
+        
+        for (let i = 0; i < 150; i++) {
+            pieces.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * -canvas.height,
+                size: Math.random() * 10 + 5,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                speed: Math.random() * 5 + 2,
+                rotation: Math.random() * 360,
+                rotationSpeed: (Math.random() - 0.5) * 2
+            });
+        }
+
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            let stillFalling = false;
+            
+            pieces.forEach(piece => {
+                ctx.save();
+                ctx.translate(piece.x, piece.y);
+                ctx.rotate(piece.rotation * Math.PI / 180);
+                ctx.fillStyle = piece.color;
+                ctx.fillRect(-piece.size / 2, -piece.size / 2, piece.size, piece.size);
+                ctx.restore();
+                
+                piece.y += piece.speed;
+                piece.rotation += piece.rotationSpeed;
+                
+                if (piece.y < canvas.height) {
+                    stillFalling = true;
+                }
+            });
+            
+            if (stillFalling) {
+                requestAnimationFrame(animate);
+            } else {
+                canvas.style.display = 'none';
+            }
+        }
+        
+        animate();
+    }
+    
     // Initialize room
     if (roomCode) {
         fetchRoomDetails();

@@ -1,26 +1,39 @@
+
 const socket = io();
 
 function createRoom() {
-    const playerName = document.getElementById('playerName').value;
-    const roomCode = generateRoomCode(); //unique room code
-    const selectedCharacter = characters[selectedCharacterIndex]; 
-    const selectedCharacterImage = `/images/${selectedCharacter}.png`; //character image path
+    try {
+        const playerName = document.getElementById('playerName').value;
+        const roomCode = generateRoomCode();
+        const selectedCharacter = characters[selectedCharacterIndex];
+        
+        console.log('Creating room with:', { playerName, roomCode, selectedCharacter });
+        
+        if (!playerName || !selectedCharacter) {
+            alert('Please enter your name and select a character.');
+            return;
+        }
 
-    if (!playerName || !selectedCharacter) {
-        alert('Please enter your name and select a character.');
-        return;
+        socket.emit('createRoom', { 
+            playerName, 
+            roomCode, 
+            character: {
+                id: selectedCharacter.id,
+                name: selectedCharacter.name,
+                image: selectedCharacter.image
+            }
+        });
+    } catch (error) {
+        console.error('Error in createRoom:', error);
+        alert('Error creating room: ' + error.message);
     }
-
-    // Emits the createRoom event to the server
-    socket.emit('createRoom', { playerName, roomCode, selectedCharacter, selectedCharacterImage });
 }
 
 function joinRoom() {
     const roomCode = document.getElementById('roomCode').value;
     const playerName = document.getElementById('playerName').value;
     const selectedCharacter = characters[selectedCharacterIndex];
-    const selectedCharacterImage = `/images/${selectedCharacter}.png`;
-
+    
     if (!roomCode || !playerName || !selectedCharacter) {
         alert('Please enter a room code, your name, and select a character.');
         return;
@@ -30,8 +43,12 @@ function joinRoom() {
     socket.emit('joinRoom', { 
         roomCode, 
         playerName, 
-        selectedCharacter, 
-        selectedCharacterImage 
+        selectedCharacter: {
+            id: selectedCharacter.id,
+            name: selectedCharacter.name,
+            image: selectedCharacter.image
+        },
+        selectedCharacterImage: selectedCharacter.image // Use the full image path from characters array
     }, (response) => {
         if (response.success) {
             window.location.href = `draw.html?room=${roomCode}`;

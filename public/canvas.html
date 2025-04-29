@@ -32,6 +32,12 @@
                 <button class="icon-button" onclick="setTool('circle')" id="circleButton">
                     <img src="images/circle-icon.png" alt="Circle">
                 </button>
+                <button class="icon-button" onclick="setTool('dropper')" id="dropperButton" title="Color Dropper">
+                    <img src="images/drop.png" alt="Dropper">
+                </button>
+                <button class="icon-button" onclick="setTool('bucket')" id="bucketButton" title="Paint Bucket">
+                    <img src="images/bucket.png" alt="Bucket">
+                </button>
             </div>
         </div>
 
@@ -44,7 +50,18 @@
         <!-- Color Picker -->
         <div class="color-picker">
             <label for="colorPicker">Color Picker</label>
-            <input type="color" id="colorPicker" onchange="setColor(this.value)">
+            <input type="color" id="colorPicker" value="#000000" onchange="setColor(this.value)">
+        </div>
+
+        <div class="color-palette">
+            <button class="color-swatch" style="background-color: #000000;" onclick="setColor('#000000')" title="Black"></button>
+            <button class="color-swatch" style="background-color: #FF0000;" onclick="setColor('#FF0000')" title="Red"></button>
+            <button class="color-swatch" style="background-color: #00FF00;" onclick="setColor('#00FF00')" title="Green"></button>
+            <button class="color-swatch" style="background-color: #0000FF;" onclick="setColor('#0000FF')" title="Blue"></button>
+            <button class="color-swatch" style="background-color: #FFFF00;" onclick="setColor('#FFFF00')" title="Yellow"></button>
+            <button class="color-swatch" style="background-color: #FF00FF;" onclick="setColor('#FF00FF')" title="Magenta"></button>
+            <button class="color-swatch" style="background-color: #00FFFF;" onclick="setColor('#00FFFF')" title="Cyan"></button>
+            <button class="color-swatch" style="background-color: #FFFFFF; border: 1px solid #999;" onclick="setColor('#FFFFFF')" title="White"></button>
         </div>
 
         <!-- Undo and Redo Buttons -->
@@ -74,50 +91,145 @@
 
         const promptDisplay = document.getElementById('promptDisplay');
         if (isMemoryMode) {
-        promptDisplay.textContent = `Memory Mode - Round ${round}`;
+            promptDisplay.textContent = `Memory Mode - Round ${round}`;
         } else {
-        // Only fetch prompt for non-memory modes
-        fetch(`/getRandomPrompt?room=${roomCode}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                promptDisplay.textContent = `Prompt: ${data.prompt}`;
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching prompt:', error);
-        });
+            // Only fetch prompt for non-memory modes
+            fetch(`/getRandomPrompt?room=${roomCode}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    promptDisplay.textContent = `Prompt: ${data.prompt}`;
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching prompt:', error);
+            });
         }
         
         const canvas = document.getElementById("drawingCanvas");
         const ctx = canvas.getContext("2d");
         let painting = false, tool = "brush", color = "#000000", size = 5;
-        let startX, startY, endX, endY, timer = 160, isDrawingShape = false;
+        let startX, startY, endX, endY, timer = 60, isDrawingShape = false;
         let freehandPaths = [], shapes = [];
         let history = [], currentHistoryIndex = -1;
         let actionSequence = 0;
 
+        // Initialize canvas with white background
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        saveState();
+
+        function floodFill(x, y, targetColor, fillColor) {
+            // Get canvas pixel data
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Convert coordinates to pixel index
+            const startPos = (Math.floor(y) * width + Math.floor(x)) * 4;
+            const targetR = data[startPos];
+            const targetG = data[startPos + 1];
+            const targetB = data[startPos + 2];
+            const targetA = data[startPos + 3];
+            
+            // Convert fill color to RGBA
+            const fillR = parseInt(fillColor.substr(1, 2), 16);
+            const fillG = parseInt(fillColor.substr(3, 2), 16);
+            const fillB = parseInt(fillColor.substr(5, 2), 16);
+            
+            // Don't fill if already the same color
+            if (targetR === fillR && targetG === fillG && targetB === fillB) {
+                return;
+            }
+            
+            // Stack-based flood fill algorithm
+            const stack = [[Math.floor(x), Math.floor(y)]];
+            const visited = new Set();
+            
+            while (stack.length > 0) {
+                const [currentX, currentY] = stack.pop();
+                const pos = (currentY * width + currentX) * 4;
+                
+                // Skip if out of bounds
+                if (currentX <= 0 || currentX >= width || currentY < 0 || currentY >= height) {
+                    continue;
+                }
+                
+                // Skip if already visited
+                const key = `${currentX},${currentY}`;
+                if (visited.has(key)) {
+                    continue;
+                }
+                
+                // Check if pixel matches the target color
+                const r = data[pos];
+                const g = data[pos + 1];
+                const b = data[pos + 2];
+                const a = data[pos + 3];
+                
+                if (r === targetR && g === targetG && b === targetB && a === targetA) {
+                    // Fill the pixel
+                    data[pos] = fillR;
+                    data[pos + 1] = fillG;
+                    data[pos + 2] = fillB;
+                    // Keep original alpha
+                    
+                    // Mark as visited
+                    visited.add(key);
+                    
+                    // Add neighboring pixels to stack
+                    stack.push([currentX + 1, currentY]);
+                    stack.push([currentX - 1, currentY]);
+                    stack.push([currentX, currentY + 1]);
+                    stack.push([currentX, currentY - 1]);
+                }
+            }
+            
+            // Put the modified data back
+            ctx.putImageData(imageData, 0, 0);
+        }
+
         function saveState() {
-            if (currentHistoryIndex < history.length - 1) history.splice(currentHistoryIndex + 1);
-            history.push({ freehandPaths: JSON.parse(JSON.stringify(freehandPaths)), shapes: JSON.parse(JSON.stringify(shapes)), actionSequence });
-            currentHistoryIndex = history.length - 1; updateUndoRedoButtons();
+            if (currentHistoryIndex < history.length - 1) {
+                history.splice(currentHistoryIndex + 1);
+            }
+            history.push({ 
+                freehandPaths: JSON.parse(JSON.stringify(freehandPaths)), 
+                shapes: JSON.parse(JSON.stringify(shapes)), 
+                actionSequence 
+            });
+            currentHistoryIndex = history.length - 1; 
+            updateUndoRedoButtons();
         }
 
         function undo() {
             if (currentHistoryIndex >= 0) {
                 currentHistoryIndex--;
                 if (currentHistoryIndex >= 0) {
-                    const st = history[currentHistoryIndex]; freehandPaths = JSON.parse(JSON.stringify(st.freehandPaths)); shapes = JSON.parse(JSON.stringify(st.shapes)); actionSequence = st.actionSequence;
-                } else { freehandPaths = []; shapes = []; actionSequence = 0; }
-                redrawCanvas(); updateUndoRedoButtons();
+                    const st = history[currentHistoryIndex]; 
+                    freehandPaths = JSON.parse(JSON.stringify(st.freehandPaths)); 
+                    shapes = JSON.parse(JSON.stringify(st.shapes)); 
+                    actionSequence = st.actionSequence;
+                } else { 
+                    freehandPaths = []; 
+                    shapes = []; 
+                    actionSequence = 0; 
+                }
+                redrawCanvas(); 
+                updateUndoRedoButtons();
             }
         }
 
         function redo() {
             if (currentHistoryIndex < history.length - 1) {
                 currentHistoryIndex++;
-                const st = history[currentHistoryIndex]; freehandPaths = JSON.parse(JSON.stringify(st.freehandPaths)); shapes = JSON.parse(JSON.stringify(st.shapes)); actionSequence = st.actionSequence;
-                redrawCanvas(); updateUndoRedoButtons();
+                const st = history[currentHistoryIndex]; 
+                freehandPaths = JSON.parse(JSON.stringify(st.freehandPaths)); 
+                shapes = JSON.parse(JSON.stringify(st.shapes)); 
+                actionSequence = st.actionSequence;
+                redrawCanvas(); 
+                updateUndoRedoButtons();
             }
         }
 
@@ -126,125 +238,262 @@
             document.getElementById("redoButton").disabled = currentHistoryIndex >= history.length - 1;
         }
 
-        function setTool(t) { tool = t; }
-        function setColor(c) { color = c; }
-        function setSize(s) { size = s; }
+        function setTool(t) { 
+            tool = t; 
+            // Highlight the active tool
+            document.querySelectorAll('.icon-button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`${t}Button`).classList.add('active');
+        }
+
+        function setColor(c) { 
+            color = c; 
+            document.getElementById("colorPicker").value = c;
+        }
+
+        function setSize(s) { 
+            size = parseInt(s); 
+        }
 
         function startPosition(e) {
             if (timer <= 0) return;
-            painting = true;
-            startX = e.clientX - canvas.getBoundingClientRect().left;
-            startY = e.clientY - canvas.getBoundingClientRect().top;
-            if (tool === 'brush' || tool === 'eraser') {
-                freehandPaths.push({ type: 'freehand', points: [{ x: startX, y: startY }], color: tool==='eraser'? '#FFFFFF': color, size, seq: actionSequence++ });
-            } else isDrawingShape = true;
-        }
-
-        function endPosition() {
-            if (isDrawingShape) {
-                if (tool==='rectangle') shapes.push({ type: 'rectangle', x: startX, y: startY, width: endX-startX, height: endY-startY, color, size, seq: actionSequence++ });
-                else if (tool==='circle') {
-                    const radius=Math.hypot(endX-startX,endY-startY);
-                    shapes.push({ type:'circle', x:startX, y:startY, radius, color, size, seq: actionSequence++ });
-                }
-                isDrawingShape=false;
+            
+            const rect = canvas.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+            
+            if (tool === 'dropper') {
+                const pixel = ctx.getImageData(startX, startY, 1, 1).data;
+                setColor(rgbToHex(pixel[0], pixel[1], pixel[2]));
+                return;
             }
-            painting=false; ctx.beginPath(); saveState();
+            
+            if (tool === 'bucket') {
+                floodFill(startX, startY, ctx.getImageData(startX, startY, 1, 1).data, color);
+                saveState();
+                return;
+            }
+
+            painting = true;
+            
+            if (tool === 'brush' || tool === 'eraser') {
+                freehandPaths.push({ 
+                    type: 'freehand', 
+                    points: [{ x: startX, y: startY }], 
+                    color: tool === 'eraser' ? '#FFFFFF' : color, 
+                    size, 
+                    seq: actionSequence++ 
+                });
+            } else {
+                isDrawingShape = true;
+            }
         }
 
         function draw(e) {
             if (!painting) return;
-            const x = e.clientX - canvas.getBoundingClientRect().left;
-            const y = e.clientY - canvas.getBoundingClientRect().top;
-            if (tool==='brush'||tool==='eraser') {
-                const path = freehandPaths[freehandPaths.length-1]; path.points.push({ x, y });
-                ctx.strokeStyle = path.color; ctx.lineWidth=path.size; ctx.lineCap="round";
-                ctx.lineTo(x,y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x,y);
-            } else { endX=x; endY=y; drawShapePreview(); }
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            if (tool === 'brush' || tool === 'eraser') {
+                const path = freehandPaths[freehandPaths.length-1]; 
+                path.points.push({ x, y });
+                redrawCanvas();
+            } else { 
+                endX = x; 
+                endY = y; 
+                drawShapePreview(); 
+            }
+        }
+
+        function endPosition() {
+            if (isDrawingShape) {
+                if (tool === 'rectangle') {
+                    shapes.push({ 
+                        type: 'rectangle', 
+                        x: startX, 
+                        y: startY, 
+                        width: endX-startX, 
+                        height: endY-startY, 
+                        color, 
+                        size, 
+                        seq: actionSequence++ 
+                    });
+                } else if (tool === 'circle') {
+                    const radius = Math.hypot(endX-startX, endY-startY);
+                    shapes.push({ 
+                        type: 'circle', 
+                        x: startX, 
+                        y: startY, 
+                        radius, 
+                        color, 
+                        size, 
+                        seq: actionSequence++ 
+                    });
+                }
+                isDrawingShape = false;
+            }
+            painting = false;
+            saveState();
         }
 
         function drawShapePreview() {
-            if (!isDrawingShape) return; redrawCanvas(); ctx.strokeStyle=color; ctx.lineWidth=size;
-            if (tool==='rectangle') ctx.strokeRect(startX,startY,endX-startX,endY-startY);
-            else { ctx.beginPath(); ctx.arc(startX,startY,Math.hypot(endX-startX,endY-startY),0,2*Math.PI); ctx.stroke(); }
+            if (!isDrawingShape) return; 
+            redrawCanvas(); 
+            ctx.strokeStyle = color; 
+            ctx.lineWidth = size;
+            
+            if (tool === 'rectangle') {
+                ctx.strokeRect(startX, startY, endX-startX, endY-startY);
+            } else if (tool === 'circle') { 
+                ctx.beginPath(); 
+                ctx.arc(startX, startY, Math.hypot(endX-startX, endY-startY), 0, 2*Math.PI); 
+                ctx.stroke(); 
+            }
         }
 
         function redrawCanvas() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const all = [...freehandPaths, ...shapes].sort((a,b)=>a.seq-b.seq);
-            all.forEach(obj=>{
-                if (obj.type==='freehand') {
-                    ctx.strokeStyle=obj.color; ctx.lineWidth=obj.size; ctx.lineCap="round"; ctx.beginPath();
-                    obj.points.forEach((pt,i)=>{ if(i===0) ctx.moveTo(pt.x,pt.y); else ctx.lineTo(pt.x,pt.y); }); ctx.stroke();
-                } else if(obj.type==='rectangle') {
-                    ctx.strokeStyle=obj.color; ctx.lineWidth=obj.size; ctx.strokeRect(obj.x,obj.y,obj.width,obj.height);
-                } else if(obj.type==='circle') {
-                    ctx.strokeStyle=obj.color; ctx.lineWidth=obj.size; ctx.beginPath(); ctx.arc(obj.x,obj.y,obj.radius,0,2*Math.PI); ctx.stroke();
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const all = [...freehandPaths, ...shapes].sort((a,b) => a.seq - b.seq);
+            all.forEach(obj => {
+                if (obj.type === 'freehand') {
+                    ctx.strokeStyle = obj.color; 
+                    ctx.lineWidth = obj.size; 
+                    ctx.lineCap = "round"; 
+                    ctx.beginPath();
+                    obj.points.forEach((pt, i) => { 
+                        if (i === 0) ctx.moveTo(pt.x, pt.y); 
+                        else ctx.lineTo(pt.x, pt.y); 
+                    }); 
+                    ctx.stroke();
+                } else if (obj.type === 'rectangle') {
+                    ctx.strokeStyle = obj.color; 
+                    ctx.lineWidth = obj.size; 
+                    ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+                } else if (obj.type === 'circle') {
+                    ctx.strokeStyle = obj.color; 
+                    ctx.lineWidth = obj.size; 
+                    ctx.beginPath(); 
+                    ctx.arc(obj.x, obj.y, obj.radius, 0, 2*Math.PI); 
+                    ctx.stroke();
                 }
             });
         }
 
-        function clearCanvas() { ctx.clearRect(0,0,canvas.width,canvas.height); freehandPaths=[]; shapes=[]; actionSequence=0; saveState(); }
-        function submitDrawing(){alert("Drawing submitted!");}
-        function startTimer(){ 
-            const timerEl=document.getElementById("timer"); 
-            const countdown=setInterval(()=>{ 
-                if(timer>0){timer--;timerEl.textContent=`Time: ${timer}s`; 
+        function clearCanvas() { 
+            if (confirm("Are you sure you want to clear the canvas?")) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "#FFFFFF";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                freehandPaths = []; 
+                shapes = []; 
+                actionSequence = 0; 
+                saveState();
+            }
+        }
 
-                } else {
-                    clearInterval(countdown);
-                    alert("Time's up!");[...document.querySelectorAll('button,input')].forEach(el=>{if(el.id!=='submitButton')el.disabled=true;
+        function rgbToHex(r, g, b) {
+            return "#" + [r, g, b].map(x => {
+                const hex = x.toString(16).padStart(2, '0');
+                return hex;
+            }).join('');
+        }
 
-                    });
-                }
-            },1000);
-        }        
-        canvas.addEventListener("mousedown",startPosition);
-        canvas.addEventListener("mouseup",endPosition);
-        canvas.addEventListener("mousemove",draw);
-        startTimer();
-
-if (isMemoryMode) {
-    // Adjust timer for memory mode
-    timer = 120; // 1 minute for memory mode drawing
+        function submitDrawing() {
+            const canvasData = canvas.toDataURL();
+            const playerName = "currentPlayerName"; // Get this from your session
     
-    // Update prompt display for memory mode
-    const promptDisplay = document.getElementById('promptDisplay');
-    promptDisplay.textContent = `Memory Mode - Round ${round}`;
-    
-    // Modify submit button for memory mode
-    document.getElementById('submitButton').addEventListener('click', () => {
-        const canvasData = canvas.toDataURL();
-        const playerName = "currentPlayerName";
-        
-        // Send drawing to server
-        fetch(`/submitMemoryDrawing`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
+            fetch(`/submitDrawing`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
                 room: roomCode, 
-                round,
-                drawing: canvasData, playerName 
+                drawing: canvasData, 
+                playerName 
             }),
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Redirect to viewing phase
-                window.location.href = `memory.html?room=${roomCode}&viewing=true`;
-            }
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // After submitting drawing, go to description page
+            window.location.href = `describe.html?room=${roomCode}`;
+        }
+    });
+}
+
+        function startTimer() { 
+            const timerEl = document.getElementById("timer"); 
+            const countdown = setInterval(() => { 
+                if (timer > 0) {
+                    timer--;
+                    timerEl.textContent = `Time: ${timer}s`;
+                    if (timer <= 10) {
+                        timerEl.style.color = "#ff0000";
+                    }
+                } else {
+                    clearInterval(countdown);
+                    timerEl.textContent = "Time's up!";
+                    [...document.querySelectorAll('button,input')].forEach(el => {
+                        if (el.id !== 'submitButton') el.disabled = true;
+                    });
+                }
+            }, 1000);
+        }
+        
+        // Initialize tool highlighting
+        setTool('brush');
+        
+        // Set up event listeners
+        canvas.addEventListener("mousedown", startPosition);
+        canvas.addEventListener("mouseup", endPosition);
+        canvas.addEventListener("mousemove", draw);
+        canvas.addEventListener("mouseout", endPosition);
+        
+        // Start the timer
+        startTimer();
+
+        if (isMemoryMode) {
+            // Adjust timer for memory mode
+            timer = 120;
+            
+            // Modify submit button for memory mode
+            document.getElementById('submitButton').addEventListener('click', () => {
+                const canvasData = canvas.toDataURL();
+                const playerName = "currentPlayerName";
+                
+                fetch(`/submitMemoryDrawing`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        room: roomCode, 
+                        round,
+                        drawing: canvasData, 
+                        playerName 
+                    }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = `memory.html?room=${roomCode}&viewing=true`;
+                    }
+                });
             });
-        });
-        // Auto-submit if time runs out
-        const timerInterval = setInterval(() => {
-            if (timer <= 0) {
-            clearInterval(timerInterval);
-            document.getElementById('submitButton').click();
-            }
-        }, 1000);
-    }
+            
+            // Auto-submit if time runs out
+            const timerInterval = setInterval(() => {
+                if (timer <= 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('submitButton').click();
+                }
+            }, 1000);
+        }
     </script>
 </body>
 </html>

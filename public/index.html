@@ -72,96 +72,119 @@
 
 <!-- Modal for Joining Room -->
 <div id="joinRoomModal" class="modal">
-  <div class="modal-content">
-    <span class="close" onclick="closeJoinRoomModal()">&times;</span>
-    <h2>Enter Room Code</h2>
-    <input type="text" id="roomCode" placeholder="Enter Room Code" />
-    <button onclick="joinRoom()">Join</button>
+    <div class="modal-content">
+      <span class="close" onclick="closeJoinRoomModal()">&times;</span>
+      <h2>Enter Room Code</h2>
+      <div class="input-container">
+        <input type="text" id="roomCode" placeholder="Enter Room Code" maxlength="6" />
+        <div class="input-glow"></div>
+      </div>
+      <button class="game-btn" onclick="joinRoom()">Join Room</button>
+    </div>
   </div>
-</div>
-</div>
 
 <script src="/socket.io/socket.io.js"></script>
 
 <script src="app.js"></script>
 <script>
-    let selectedCharacterIndex = 0; // Track the currently selected character
+     let selectedCharacterIndex = 0; // Track the currently selected character
 
-    const characters = [
-        'character1',
-        'character2',
-        'character3',
-        'character4',
-        'character5',
-        'character6',
-        'character7'
-    ];
+     const characters = [
+    { id: 'character1', name: 'Astronaut', image: 'images/character1.png' },
+    { id: 'character2', name: 'Alien', image: 'images/character2.png' },
+    { id: 'character3', name: 'Robot', image: 'images/character3.png' },
+    { id: 'character4', name: 'Wizard', image: 'images/character4.png' },
+    { id: 'character5', name: 'Pirate', image: 'images/character5.png' },
+    { id: 'character6', name: 'Ninja', image: 'images/character6.png' },
+    { id: 'character7', name: 'Detective', image: 'images/character7.png' }
+];
 
-    // Function to show the selected character and hide others
-    function changeCharacter(direction) {
-        // Hide all images
-        characters.forEach(character => {
-            document.getElementById(character).classList.remove('selected');
-        });
+// Function to show the selected character and hide others
+function changeCharacter(direction) {
+    // Hide all images
+    characters.forEach(char => {
+        document.getElementById(char.id).classList.remove('selected');
+    });
 
-        // Update the index based on direction
-        if (direction === 'next') {
-            selectedCharacterIndex = (selectedCharacterIndex + 1) % characters.length;
-        } else if (direction === 'prev') {
-            selectedCharacterIndex = (selectedCharacterIndex - 1 + characters.length) % characters.length;
-        }
-
-        // Show the selected character
-        const selectedCharacter = characters[selectedCharacterIndex];
-        document.getElementById(selectedCharacter).classList.add('selected');
+    // Update the index based on direction
+    if (direction === 'next') {
+        selectedCharacterIndex = (selectedCharacterIndex + 1) % characters.length;
+    } else if (direction === 'prev') {
+        selectedCharacterIndex = (selectedCharacterIndex - 1 + characters.length) % characters.length;
     }
 
-    // Open Join Room Modal
-    function openJoinRoomModal() {
-        document.getElementById('joinRoomModal').style.display = "block";
+    // Show the selected character
+    const selectedCharacter = characters[selectedCharacterIndex];
+    document.getElementById(selectedCharacter.id).classList.add('selected');
+    
+    // Update character name display if you have one
+    const charNameDisplay = document.getElementById('characterName');
+    if (charNameDisplay) {
+        charNameDisplay.textContent = selectedCharacter.name;
     }
+}
 
-    // Close Join Room Modal
-    function closeJoinRoomModal() {
-        document.getElementById('joinRoomModal').style.display = "none";
-    }
+// Open Join Room Modal
+function openJoinRoomModal() {
+    document.getElementById('joinRoomModal').style.display = "block";
+}
 
-    //slideshow's script
-    let currentSlide = 0;
-    const slides = document.querySelectorAll('.slide');
-    const indicators = document.querySelectorAll('.indicator');
+// Close Join Room Modal
+function closeJoinRoomModal() {
+    document.getElementById('joinRoomModal').style.display = "none";
+}
 
-    function showSlide(n) {
-        // Hide all slides
-        slides.forEach(slide => {
-            slide.classList.remove('active');
-        });
-        
-        // Remove active class from all indicators
-        indicators.forEach(indicator => {
-            indicator.classList.remove('active');
-        });
-        
-        // Show the selected slide
-        currentSlide = (n + slides.length) % slides.length;
-        slides[currentSlide].classList.add('active');
-        indicators[currentSlide].classList.add('active');
-    }
+function showRoomCreatedModal(roomCode) {
+    const modal = document.getElementById('roomCreatedModal');
+    const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+    roomCodeDisplay.textContent = roomCode;
+    modal.style.display = "block";
+}
 
-    function nextSlide() {
-        showSlide(currentSlide + 1);
-    }
+function closeRoomCreatedModal() {
+    document.getElementById('roomCreatedModal').style.display = "none";
+    // Redirect to the game page
+    const roomCode = document.getElementById('roomCodeDisplay').textContent;
+    window.location.href = `draw.html?room=${roomCode}`;
+}
 
-    function prevSlide() {
-        showSlide(currentSlide - 1);
-    }
+//slideshow's script
+let currentSlide = 0;
+const slides = document.querySelectorAll('.slide');
+const indicators = document.querySelectorAll('.indicator');
 
-    function goToSlide(n) {
-        showSlide(n);
-    }
+function showSlide(n) {
+    // Hide all slides
+    slides.forEach(slide => {
+        slide.classList.remove('active');
+    });
+    
+    // Remove active class from all indicators
+    indicators.forEach(indicator => {
+        indicator.classList.remove('active');
+    });
+    
+    // Show the selected slide
+    currentSlide = (n + slides.length) % slides.length;
+    slides[currentSlide].classList.add('active');
+    indicators[currentSlide].classList.add('active');
+}
 
-    //Auto-advances slide every 5 seconds
-    setInterval(nextSlide, 5000);
+function nextSlide() {
+    showSlide(currentSlide + 1);
+}
+
+function prevSlide() {
+    showSlide(currentSlide - 1);
+}
+
+function goToSlide(n) {
+    showSlide(n);
+}
+
+//Auto-advances slide every 5 seconds
+setInterval(nextSlide, 5000);
+
 
 </script>
 

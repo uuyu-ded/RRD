@@ -133,6 +133,12 @@ app.post('/submitPrompt', async (req, res) => {
         roomDetails.prompts.push(prompt);
         await roomDetails.save();
 
+        // Notify all clients in the room about the submission count
+        io.to(room).emit('promptSubmitted', { 
+            count: roomDetails.prompts.length,
+            totalPlayers: roomDetails.players.length 
+        });
+
         res.status(200).json({ success: true });
     } catch (error) {
         console.error('Error submitting prompt:', error);
@@ -170,6 +176,53 @@ app.get('/getRandomPrompt', async (req, res) => {
         res.status(200).json({ success: true, prompt: randomPrompt });
     } catch (error) {
         console.error('Error fetching prompt:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+app.post('/submitDescription', async (req, res) => {
+    const { room, description, playerName } = req.body;
+
+    if (!room || !description || !playerName) {
+        return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    try {
+        const roomDetails = await Room.findOne({ roomCode: room });
+        if (!roomDetails) {
+            return res.status(404).json({ success: false, error: 'Room not found' });
+        }
+
+        // Store the description
+        if (!roomDetails.descriptions) {
+            roomDetails.descriptions = new Map();
+        }
+        roomDetails.descriptions.set(playerName, description);
+        await roomDetails.save();
+
+        // Check if all players have submitted descriptions
+        if (roomDetails.players.every(p => roomDetails.descriptions.has(p.name))) {
+            // All descriptions submitted, rotate prompts
+            const playerNames = roomDetails.players.map(p => p.name);
+            
+            // Create a rotation where:
+            // - You don't get your own prompt
+            // - You don't get the prompt from someone who described your drawing
+            const rotatedPrompts = new Map();
+            // Implementation depends on your specific rotation rules
+            
+            roomDetails.rotatedPrompts = rotatedPrompts;
+            roomDetails.status = 'guessing';
+            await roomDetails.save();
+            
+            io.to(room).emit('startGuessing', {
+                prompts: Object.fromEntries(rotatedPrompts)
+            });
+        }
+
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error('Error submitting description:', error);
         res.status(500).json({ success: false, error: 'Internal server error' });
     }
 });
@@ -250,24 +303,36 @@ io.on('connection', (socket) => {
     console.log('A user connected');
 
     socket.on('createRoom', async (data) => {
-        const { playerName, roomCode, selectedCharacter, selectedCharacterImage } = data;
-
+        const { playerName, roomCode, character } = data;
+    
         // Check if the room already exists
         const existingRoom = await Room.findOne({ roomCode });
         if (existingRoom) {
             socket.emit('roomError', 'Room code already exists!');
             return;
         }
-
-        // Create a new room
+    
+        // Validate character data
+        if (!character || !character.id || !character.name || !character.image) {
+            socket.emit('roomError', 'Invalid character data!');
+            return;
+        }
+    
+        // Create a new room with the character data
         const newRoom = new Room({
             roomCode,
-            players: [{ name: playerName, character: selectedCharacter, characterImage: selectedCharacterImage }],
+            players: [{ 
+                name: playerName, 
+                character: {
+                    id: character.id,
+                    name: character.name,
+                    image: character.image
+                }
+            }],
         });
-
+    
         try {
             await newRoom.save();
-            // Emit the roomCreated event with the room details
             socket.emit('roomCreated', newRoom);
             socket.join(roomCode); 
         } catch (error) {
@@ -321,10 +386,63 @@ io.on('connection', (socket) => {
             callback({ success: false, error: 'Error joining room' });
         }
     });
-    
+
     socket.on('joinSocketRoom', (roomCode) => {
         socket.join(roomCode);
         console.log(`Player joined socket room: ${roomCode}`);
+    });
+
+    socket.on('disconnect', async () => {
+        console.log('A user disconnected');
+        
+        // Find and update rooms where this player was present
+        const rooms = await Room.find({});
+        for (const room of rooms) {
+            const playerIndex = room.players.findIndex(p => p.name === socket.playerName);
+            if (playerIndex !== -1) {
+                room.players.splice(playerIndex, 1);
+                await room.save();
+                
+                // Notify remaining players
+                io.to(room.roomCode).emit('roomUpdated', room);
+                
+                // Delete room if empty
+                if (room.players.length === 0) {
+                    await Room.deleteOne({ roomCode: room.roomCode });
+                }
+                break;
+            }
+        }
+    });
+
+    socket.on('submitGuess', async ({ roomCode, guess, playerName }, callback) => {
+        try {
+            const room = await Room.findOne({ roomCode });
+            if (!room) {
+                callback({ success: false, error: 'Room not found' });
+                return;
+            }
+
+            // Store the guess
+            if (!room.guesses) {
+                room.guesses = new Map();
+            }
+            room.guesses.set(playerName, guess);
+            await room.save();
+
+            // Check if all players have submitted guesses
+            if (room.players.every(p => room.guesses.has(p.name))) {
+                // All guesses submitted, show results
+                io.to(roomCode).emit('showResults', {
+                    results: collectResults(room) // Implement this function
+                });
+            }
+
+            callback({ success: true });
+        } catch (error) {
+            console.error('Error submitting guess:', error);
+            callback({ success: false, error: 'Error submitting guess' });
+        }
     });
 
     socket.on('startMemoryGame', async ({ roomCode }) => {
@@ -388,32 +506,6 @@ io.on('connection', (socket) => {
     });
     
 
-    // Handle player disconnection
-    socket.on('disconnect', async () => {
-        console.log('A user disconnected');
-
-        // Find the room the player was in
-        const rooms = await Room.find({});
-        for (const room of rooms) {
-            const playerIndex = room.players.findIndex(player => player.name === socket.playerName);
-            if (playerIndex !== -1) {
-                // Remove the player from the room
-                room.players.splice(playerIndex, 1);
-                await room.save();
-
-                // Notify other players in the room that a player has left
-                io.to(room.roomCode).emit('playerLeft', { playerName: socket.playerName });
-
-                // If the room is empty, delete it
-                if (room.players.length === 0) {
-                    await Room.deleteOne({ roomCode: room.roomCode });
-                    console.log(`Room ${room.roomCode} deleted because it is empty.`);
-                }
-
-                break;
-            }
-        }
-    });
 });
 
 // Serve static files if you're using Express to serve them

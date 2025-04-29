@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RoundRobinDraw - Prompt</title>
     <link rel="stylesheet" href="prompt.css">
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
     <img src="images/icon.png" alt="RoundRobinDraw Logo" class="logo">
@@ -19,80 +20,97 @@
         </div>
     </div>
 
-    <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const roomCode = urlParams.get('room');
-        let submittedPrompt = "";
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomCode = urlParams.get('room');
+    let submittedPrompt = "";
+    let timeLeft = 20;
+    let timerInterval;
+    const timerElement = document.getElementById("timer");
+    const inputElement = document.getElementById("promptInput");
+    const doneButton = document.getElementById("doneButton");
+    const editButton = document.getElementById("editButton");
+    const socket = io();
 
-        let timeLeft = 20;
-        const timerElement = document.getElementById("timer");
-        const inputElement = document.getElementById("promptInput");
-        const doneButton = document.getElementById("doneButton");
-        const editButton = document.getElementById("editButton");
+    // Initialize socket connection
+    socket.on('connect', () => {
+        socket.emit('joinSocketRoom', roomCode);
+    });
 
-        doneButton.addEventListener("click", () => {
-            const prompt = inputElement.value.trim();
-            if (prompt === "") {
-                alert("Please enter a valid prompt.");
-                return;
-            }
+    // Listen for prompt submission updates
+    socket.on('promptSubmitted', ({ count, totalPlayers }) => {
+        // If N-1 players have submitted (where N is total players)
+        if (count <= totalPlayers - 1 || 1 && timeLeft > 5) {
+            timeLeft = 5; // Reduce timer to 5 seconds
+            timerElement.textContent = timeLeft;
+            timerElement.style.color = 'red'; // Visual feedback
+            timerElement.style.fontWeight = 'bold';
+            
+            // Show warning to remaining players
+            //if (!submittedPrompt) {
+           //     alert(`Hurry! ${count}/${totalPlayers} players have submitted. Timer reduced to 5 seconds!`);
+            //}
+        }
+    });
 
-            submittedPrompt = prompt;
-            submitPrompt(prompt);
-            inputElement.disabled = true;
-            doneButton.disabled = true;
-            doneButton.style.display = 'none'; // hide DONE!
-            editButton.style.display = 'inline-block'; // show EDIT
-        });
+    doneButton.addEventListener("click", () => {
+        const prompt = inputElement.value.trim();
+        if (prompt === "") {
+            alert("Please enter a valid prompt.");
+            return;
+        }
 
-        editButton.addEventListener("click", () => {
-            // Enable editing
-            inputElement.disabled = false;
-            inputElement.focus();
-            doneButton.disabled = false;
-            doneButton.style.display = 'inline-block';
-            editButton.style.display = 'none';
-        });
+        submittedPrompt = prompt;
+        submitPrompt(prompt);
+        inputElement.disabled = true;
+        doneButton.disabled = true;
+        doneButton.style.display = 'none';
+        editButton.style.display = 'inline-block';
+    });
 
-        function submitPrompt(prompt) {
-            // Send the prompt to the server
-            fetch(`/submitPrompt`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ room: roomCode, prompt }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    inputElement.disabled = true;
-                    doneButton.disabled = true;
-                    editButton.style.display = 'inline-block'; // Show edit button
-                } else {
-                    alert('Failed to submit prompt.');
-                    inputElement.disabled = false;
-                    doneButton.disabled = false;
-                }
-            })
-            .catch(error => {
-                console.error('Error submitting prompt:', error);
+    editButton.addEventListener("click", () => {
+        inputElement.disabled = false;
+        inputElement.focus();
+        doneButton.disabled = false;
+        doneButton.style.display = 'inline-block';
+        editButton.style.display = 'none';
+    });
+
+    function submitPrompt(prompt) {
+        fetch(`/submitPrompt`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ room: roomCode, prompt }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
                 alert('Failed to submit prompt.');
                 inputElement.disabled = false;
                 doneButton.disabled = false;
-            });
-        }
+            }
+        })
+        .catch(error => {
+            console.error('Error submitting prompt:', error);
+            alert('Failed to submit prompt.');
+            inputElement.disabled = false;
+            doneButton.disabled = false;
+        });
+    }
 
-        const countdown = setInterval(() => {
+    function startCountdown() {
+        timerInterval = setInterval(() => {
             timeLeft--;
             timerElement.textContent = timeLeft;
+            
             if (timeLeft <= 0) {
-                clearInterval(countdown);
+                clearInterval(timerInterval);
                 inputElement.disabled = true;
                 doneButton.disabled = true;
                 editButton.style.display = 'none';
 
-                //checking game before redirecting
                 fetch(`/getRoomDetails?room=${roomCode}`)
                 .then(response => response.json())
                 .then(data => {
@@ -106,6 +124,10 @@
                 });
             }
         }, 1000);
-    </script>
+    }
+
+    // Start the countdown when page loads
+    startCountdown();
+</script>
 </body>
 </html>
