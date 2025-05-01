@@ -2,7 +2,7 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import connectDB from './db.js'; // MongoDB connection
-import Room from './rooms.js'; // Room model
+import { Room } from './rooms.js'; // Room model 
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -81,6 +81,11 @@ app.post('/startGame', async (req, res) => {
         return res.status(400).json({ success: false, error: 'Room code and mode are required' });
     }
 
+    // Validate mode
+    if (!['prompt', 'copycat'].includes(mode)) {
+        return res.status(400).json({ success: false, error: 'Invalid game mode' });
+    }
+
     try {
         const roomDetails = await Room.findOne({ roomCode: room });
         if (!roomDetails) {
@@ -89,7 +94,7 @@ app.post('/startGame', async (req, res) => {
 
         roomDetails.mode = mode;
         
-        if (mode === 'memory') {
+        if (mode === 'copycat') {
             // Initialize memory game specific fields
             roomDetails.status = 'drawing';
             roomDetails.currentRound = 1;
@@ -99,7 +104,7 @@ app.post('/startGame', async (req, res) => {
             // Notify players to start memory game
             io.to(room).emit('memoryGameStarted', { 
                 round: 1,
-                maxRounds: roomDetails.maxRounds 
+                maxRounds: roomDetails.maxRounds || 3 // Default to 3 rounds if not set
             });
         } else {
             // Regular prompt mode
@@ -110,8 +115,17 @@ app.post('/startGame', async (req, res) => {
 
         res.status(200).json({ success: true });
     } catch (error) {
-        console.error('Error starting game:', error);
-        res.status(500).json({ success: false, error: 'Internal server error' });
+        console.error('Detailed error starting game:', {
+            error: error.message,
+            stack: error.stack,
+            room,
+            mode
+        });
+        res.status(500).json({ 
+            success: false, 
+            error: 'Internal server error',
+            details: error.message 
+        });
     }
 });
 
@@ -302,23 +316,68 @@ app.get('/getDrawings', async (req, res) => {
 io.on('connection', (socket) => {
     console.log('A user connected');
 
+    socket.on('startGame', async ({ roomCode, mode }, callback) => {
+        try {
+            console.log(`Starting game in room ${roomCode} with mode ${mode}`);
+            
+            const room = await Room.findOne({ roomCode });
+            if (!room) {
+                callback({ success: false, error: 'Room not found' });
+                return;
+            }
+    
+            // Calculate rounds based on player count
+            const playerCount = room.players.length;
+            const maxRounds = calculateRounds(playerCount); // Helper function defined below
+    
+            // Update room state
+            room.mode = mode;
+            room.status = mode === 'copycat' ? 'drawing' : 'prompt';
+            room.currentRound = 1;
+            room.maxRounds = maxRounds;
+            room.drawings = new Map();
+            room.prompts = [];
+            
+            await room.save();
+    
+            // Notify all players
+            io.to(roomCode).emit('gameStarted', { 
+                mode,
+                currentRound: 1,
+                maxRounds,
+                playerCount
+            });
+    
+            // Redirect players based on mode
+            if (mode === 'copycat') {
+                io.to(roomCode).emit('memoryGameStarted', {
+                    round: 1,
+                    maxRounds
+                });
+            } else {
+                io.to(roomCode).emit('promptPhaseStarted');
+            }
+    
+            callback({ success: true });
+        } catch (error) {
+            console.error('Error starting game:', error);
+            callback({ 
+                success: false, 
+                error: 'Failed to start game',
+                details: error.message
+            });
+        }
+    });
+
     socket.on('createRoom', async (data) => {
         const { playerName, roomCode, character } = data;
     
-        // Check if the room already exists
         const existingRoom = await Room.findOne({ roomCode });
         if (existingRoom) {
             socket.emit('roomError', 'Room code already exists!');
             return;
         }
     
-        // Validate character data
-        if (!character || !character.id || !character.name || !character.image) {
-            socket.emit('roomError', 'Invalid character data!');
-            return;
-        }
-    
-        // Create a new room with the character data
         const newRoom = new Room({
             roomCode,
             players: [{ 
@@ -340,6 +399,12 @@ io.on('connection', (socket) => {
             socket.emit('roomError', 'Error creating room!');
         }
     });
+
+    function calculateRounds(playerCount) {
+        if (playerCount <= 3) return 3;
+        if (playerCount <= 5) return 2;
+        return 1; // For larger groups, do just 1 round to keep game length reasonable
+    }
 
     socket.on('joinRoom', async ({ roomCode, playerName, selectedCharacter, selectedCharacterImage }, callback) => {
         try {
@@ -395,23 +460,84 @@ io.on('connection', (socket) => {
     socket.on('disconnect', async () => {
         console.log('A user disconnected');
         
-        // Find and update rooms where this player was present
-        const rooms = await Room.find({});
-        for (const room of rooms) {
-            const playerIndex = room.players.findIndex(p => p.name === socket.playerName);
-            if (playerIndex !== -1) {
-                room.players.splice(playerIndex, 1);
+        if (!socket.playerName) return;
+        
+        try {
+            const rooms = await Room.find({ 'players.name': socket.playerName });
+            
+            for (const room of rooms) {
+                // Check if this was the room creator (first player)
+                const wasCreator = room.players.length > 0 && room.players[0].name === socket.playerName;
+                
+                // Remove the player
+                room.players = room.players.filter(p => p.name !== socket.playerName);
+                
+                if (room.players.length === 0 || wasCreator) {
+                    // Delete the entire room if empty or if creator left
+                    await Room.deleteOne({ roomCode: room.roomCode });
+                    console.log(`Room ${room.roomCode} deleted (creator left or room empty)`);
+                    
+                    // Notify all players in the room that it's being deleted
+                    io.to(room.roomCode).emit('roomDeleted', { 
+                        reason: wasCreator ? 'creator_left' : 'last_player_left'
+                    });
+                } else {
+                    // Otherwise just save the updated player list
+                    await room.save();
+                    
+                    // Notify remaining players
+                    io.to(room.roomCode).emit('playerLeft', { 
+                        playerName: socket.playerName,
+                        players: room.players 
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error handling disconnect:', error);
+        }
+    });
+
+    socket.on('leaveRoom', async ({ roomCode, playerName }, callback) => {
+        try {
+            const room = await Room.findOne({ roomCode });
+            if (!room) {
+                callback({ success: false, error: 'Room not found' });
+                return;
+            }
+    
+            // Check if this was the room creator (first player)
+            const wasCreator = room.players.length > 0 && room.players[0].name === playerName;
+            
+            // Remove the player
+            room.players = room.players.filter(p => p.name !== playerName);
+            
+            if (room.players.length === 0 || wasCreator) {
+                // Delete the entire room if empty or if creator left
+                await Room.deleteOne({ roomCode });
+                console.log(`Room ${roomCode} deleted (creator left or room empty)`);
+                
+                // Notify all players in the room that it's being deleted
+                io.to(roomCode).emit('roomDeleted', { 
+                    reason: wasCreator ? 'creator_left' : 'last_player_left'
+                });
+            } else {
+                // Otherwise just save the updated player list
                 await room.save();
                 
                 // Notify remaining players
-                io.to(room.roomCode).emit('roomUpdated', room);
-                
-                // Delete room if empty
-                if (room.players.length === 0) {
-                    await Room.deleteOne({ roomCode: room.roomCode });
-                }
-                break;
+                io.to(roomCode).emit('playerLeft', { 
+                    playerName,
+                    players: room.players 
+                });
             }
+    
+            // Leave the socket room
+            socket.leave(roomCode);
+            
+            callback({ success: true });
+        } catch (error) {
+            console.error('Error leaving room:', error);
+            callback({ success: false, error: 'Error leaving room' });
         }
     });
 
@@ -470,40 +596,41 @@ io.on('connection', (socket) => {
     });
     
     socket.on('nextMemoryRound', async ({ roomCode }) => {
-        try {
-            const room = await Room.findOne({ roomCode });
-            if (!room) {
-                socket.emit('error', 'Room not found');
-                return;
-            }
-    
-            // Check if game is complete
-            if (room.currentRound >= room.maxRounds) {
-                room.status = 'completed';
-                await room.save();
-                io.to(roomCode).emit('memoryGameCompleted');
-                return;
-            }
-    
-            // Prepare for next round
-            room.currentRound += 1;
-            room.status = 'drawing';
-            room.drawings = new Map(); // Clear previous drawings
-            await room.save();
-    
-            // Rotate drawings between players
-            const playerNames = room.players.map(p => p.name);
-            const rotatedNames = [...playerNames.slice(1), playerNames[0]];
-            
-            io.to(roomCode).emit('nextMemoryRound', { 
-                round: room.currentRound,
-                playerOrder: rotatedNames 
-            });
-        } catch (error) {
-            console.error('Error advancing memory round:', error);
-            socket.emit('error', 'Failed to advance round');
+    try {
+        const room = await Room.findOne({ roomCode });
+        if (!room) {
+            socket.emit('error', 'Room not found');
+            return;
         }
-    });
+
+        // Check if game is complete
+        if (room.currentRound >= room.maxRounds) {
+            room.status = 'completed';
+            await room.save();
+            io.to(roomCode).emit('memoryGameCompleted');
+            return;
+        }
+
+        // Prepare for next round
+        room.currentRound += 1;
+        room.status = 'drawing';
+        room.drawings = new Map();
+        await room.save();
+
+        // Determine player order for this round
+        const playerNames = room.players.map(p => p.name);
+        const rotatedNames = [...playerNames.slice(room.currentRound), ...playerNames.slice(0, room.currentRound)];
+        
+        io.to(roomCode).emit('nextMemoryRound', { 
+            round: room.currentRound,
+            playerOrder: rotatedNames,
+            totalRounds: room.maxRounds
+        });
+    } catch (error) {
+        console.error('Error advancing memory round:', error);
+        socket.emit('error', 'Failed to advance round');
+    }
+});
     
 
 });

@@ -1,3 +1,15 @@
+import mongoose from 'mongoose';
+delete mongoose.connection.models['Room'];
+
+const playerSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    character: {
+        id: { type: String, required: true },
+        name: { type: String, required: true },
+        image: { type: String, required: true }
+    }
+});
+
 const roundSchema = new mongoose.Schema({
     prompts: { type: Map, of: String }, // playerName -> prompt
     drawings: { type: Map, of: String }, // playerName -> drawingDataURL
@@ -10,16 +22,21 @@ const roomSchema = new mongoose.Schema({
     mode: { 
         type: String, 
         default: 'prompt',
-        enum: ['prompt', 'telephone'] 
+        enum: ['prompt', 'copycat'] 
     },
     status: { 
         type: String,
         default: 'waiting',
-        enum: ['waiting', 'writing', 'drawing', 'guessing', 'completed']
+        enum: ['waiting', 'writing', 'drawing', 'guessing', 'completed', 'prompt', 'viewing']
     },
     currentRound: { type: Number, default: 0 },
-    maxRounds: { type: Number, default: 3 },
-    rounds: [roundSchema], // Stores data for each round
-    currentPromptAssignments: { type: Map, of: String }, // playerName -> prompt
-    currentDrawingAssignments: { type: Map, of: String } // playerName -> drawingDataURL
+    maxRounds: { type: Number, default: 0 }, // Will be calculated based on players
+    rounds: [roundSchema],
+    currentPromptAssignments: { type: Map, of: String },
+    currentDrawingAssignments: { type: Map, of: String }
 }, { timestamps: true });
+
+// Create and export the Room model
+const Room = mongoose.model('Room', roomSchema);
+
+export { Room };

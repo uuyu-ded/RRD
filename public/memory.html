@@ -32,15 +32,17 @@
     };
 
     function startViewingPhase() {
-      fetch(`/getDrawings?room=${roomCode}`)
+    fetch(`/getDrawings?room=${roomCode}`)
         .then(response => response.json())
         .then(data => {
-          if (data.success) {
-            displayDrawings(data.drawings);
-            startViewTimer();
-          }
+            if (data.success) {
+                displayDrawings(data.drawings);
+                // Adjust viewing time based on number of drawings
+                viewTimeLeft = Math.min(30, 10 + Object.keys(data.drawings).length * 5);
+                startViewTimer();
+            }
         });
-    }
+}
 
     function displayDrawings(drawings) {
       const container = document.getElementById('drawings-container');
@@ -56,17 +58,19 @@
     }
 
     function startViewTimer() {
-      const timerElement = document.getElementById('timer');
-      const timer = setInterval(() => {
+    const timerElement = document.getElementById('timer');
+    timerElement.textContent = `Time left: ${viewTimeLeft}s`;
+    
+    const timer = setInterval(() => {
         viewTimeLeft--;
         timerElement.textContent = `Time left: ${viewTimeLeft}s`;
         
         if (viewTimeLeft <= 0) {
-          clearInterval(timer);
-          socket.emit('nextMemoryRound', { roomCode });
+            clearInterval(timer);
+            socket.emit('nextMemoryRound', { roomCode });
         }
-      }, 1000);
-    }
+    }, 1000);
+}
 
     // Socket listeners
     socket.on('nextMemoryRound', ({ round }) => {

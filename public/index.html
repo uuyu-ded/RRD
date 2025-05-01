@@ -5,9 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RoundRobin Draw</title>
     <link rel="stylesheet" href="index.css">
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 <div class="whole">
+    <div class="container">
+        <h1>WELCOME</h1>
+        <img src="images/icon.png" alt="icon" id="icon">
+        <!-- Character Selection -->
+        <div class="character-select">
+            <label for="character">Choose your character:</label>
+            <div class="character-images">
+                <button onclick="changeCharacter('prev')">&lt;</button>
+                <img src="images/character1.png" alt="Character 1" id="character1" class="selected" />
+                <img src="images/character2.png" alt="Character 2" id="character2" />
+                <img src="images/character3.png" alt="Character 3" id="character3" />
+                <img src="images/character4.png" alt="Character 4" id="character4" />
+                <img src="images/character5.png" alt="Character 5" id="character5" />
+                <img src="images/character6.png" alt="Character 6" id="character6" />
+                <img src="images/character7.png" alt="Character 7" id="character7" />
+                <button onclick="changeCharacter('next')">&gt;</button>
+            </div>
+        </div>
+
+        <input type="text" id="playerName" placeholder="Enter player name" />
+        <div>
+            <button onclick="createRoom()" id="zzz">Create Room</button>
+            <button onclick="openJoinRoomModal()" id="zzz">Join Room</button>
+        </div>
+    </div>
+
     <div class="slideshow-container">
         <div class="slide active">
             <h3>How to Play</h3>
@@ -42,32 +69,6 @@
             <span class="indicator" onclick="goToSlide(3)"></span>
         </div>
     </div>
-
-
-<div class="container">
-    <h1>WELCOME</h1>
-    <img src="images/icon.png" alt="icon" id="icon">
-    <!-- Character Selection -->
-    <div class="character-select">
-        <label for="character">Choose your character:</label>
-        <div class="character-images">
-            <button onclick="changeCharacter('prev')">&lt;</button>
-            <img src="images/character1.png" alt="Character 1" id="character1" class="selected" />
-            <img src="images/character2.png" alt="Character 2" id="character2" />
-            <img src="images/character3.png" alt="Character 3" id="character3" />
-            <img src="images/character4.png" alt="Character 4" id="character4" />
-            <img src="images/character5.png" alt="Character 5" id="character5" />
-            <img src="images/character6.png" alt="Character 6" id="character6" />
-            <img src="images/character7.png" alt="Character 7" id="character7" />
-            <button onclick="changeCharacter('next')">&gt;</button>
-        </div>
-    </div>
-
-    <input type="text" id="playerName" placeholder="Enter player name" />
-    <div>
-        <button onclick="createRoom()" id="zzz">Create Room</button>
-    <button onclick="openJoinRoomModal()" id="zzz">Join Room</button>
-    </div>
 </div>
 
 <!-- Modal for Joining Room -->
@@ -83,7 +84,7 @@
     </div>
   </div>
 
-<script src="/socket.io/socket.io.js"></script>
+
 
 <script src="app.js"></script>
 <script>
@@ -184,8 +185,6 @@ function goToSlide(n) {
 
 //Auto-advances slide every 5 seconds
 setInterval(nextSlide, 5000);
-
-
 </script>
 
 </body>

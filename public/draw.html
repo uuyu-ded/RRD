@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Fun Drawing Game Room</title>
         <link rel="stylesheet" href="draw.css">
+        <script src="/socket.io/socket.io.js"></script>
         <link href="https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap" rel="stylesheet">
     </head>
     <body>
@@ -30,6 +31,7 @@
         <div class="mode-container">
             <button onclick="chooseMode('prompt')">🎨 Prompt Mode</button>
             <button onclick="chooseMode('copycat')">🐱 Copycat Mode</button>
+            <button onclick="leaveRoom()" class="leave-button">🚪 Leave Room</button>
         </div>
     </div>
     
@@ -41,6 +43,7 @@
             <p>You are starting <span id="selectedMode" style="font-weight: bold;"></span> mode.</p>
             <p>Ready to have fun?</p>
             <button id="startGameButton" onclick="startGame()">LET'S GO!</button>
+            
         </div>
     </div>
     
@@ -51,6 +54,7 @@
     const urlParams = new URLSearchParams(window.location.search);
     const roomCode = urlParams.get('room'); // Get room code from URL
 
+    const socket = io();
     //listening for room updates
     //socket.on('roomUpdated', (room) => {
     //updatePlayerList(room.players);
@@ -187,13 +191,81 @@
         modal.style.display = 'none';
     }
 
+    function leaveRoom() {
+    if (!confirm('Are you sure you want to leave the room?')) {
+        return; // User clicked "Cancel"
+    }
+
+    const playerName = localStorage.getItem('playerName');
+    if (!playerName) {
+        //alert("Could not find your player name. Redirecting to home page.");
+        window.location.href = 'index.html';
+        return;
+    }
+
+    socket.emit('leaveRoom', { 
+        roomCode: roomCode,
+        playerName: playerName 
+    }, (response) => {
+        if (response && response.success) {
+            // Clean up and redirect
+            localStorage.removeItem('playerName');
+            localStorage.removeItem('roomCode');
+            window.location.href = 'index.html';
+        } else {
+            alert(response?.error || "Failed to leave room. Try again.");
+        }
+    });
+}
+
+socket.on('playerLeft', ({ playerName, players }) => {
+    updatePlayerList(players);
+    
+    // Check if the creator left
+    if (players.length > 0 && players[0].name !== playerName) {
+        const notification = document.createElement('div');
+        notification.textContent = `${playerName} has left the room`;
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.left = '50%';
+        notification.style.transform = 'translateX(-50%)';
+        notification.style.backgroundColor = '#f44336';
+        notification.style.color = 'white';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '20px';
+        notification.style.zIndex = '1000';
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 3000);
+    }
+});
+
+socket.on('roomDeleted', ({ reason }) => {
+    let message = 'The room has been closed';
+    if (reason === 'creator_left') {
+        message = 'The room creator has left - the room is now closed';
+    } else if (reason === 'last_player_left') {
+        message = 'The last player has left - the room is now closed';
+    }
+    
+    alert(message);
+    window.location.href = 'index.html';
+});
+
+window.addEventListener('beforeunload', () => {
+    // This will trigger the socket.io disconnect event
+    // which will handle the cleanup on the server
+});
+
 // Start the game
 function startGame() {
-    const mode = document.getElementById('selectedMode').
-    textContent.includes('Prompt') ? 'prompt' : 'copycat';
-    //alert(`Starting game in ${mode} mode!`);
+    const mode = document.getElementById('selectedMode').textContent.includes('Prompt') ? 'prompt' : 'copycat';
+    console.log('Starting game with:', { room: roomCode, mode }); // Add this line
+    
     showConfetti();
-    closeStartGameModal(); // Close the modal after starting the game
+    closeStartGameModal();
 
     fetch(`/startGame`, {
         method: 'POST',
@@ -204,7 +276,8 @@ function startGame() {
     })
     .then(response => {
         if (!response.ok) {
-            throw new Error('Network response was not ok');
+            // Get the error message from the response if possible
+            return response.json().then(err => Promise.reject(err));
         }
         return response.json();
     })
@@ -220,14 +293,9 @@ function startGame() {
         }
     })
     .catch(error => {
-        console.error('Error starting game:', error);
-        alert('Failed to start the game: ' + error.message);
+        console.error('Full error details:', error); // Log full error
+        alert('Failed to start the game: ' + (error.error || error.message || 'Unknown error'));
     });
-
-    setTimeout(() => {
-            closeStartGameModal();
-            alert(`Game starting in ${mode} mode! In a real app, you would be redirected to the game page.`);
-        }, 2000);
 }
 
 function showConfetti() {
@@ -291,7 +359,7 @@ function showConfetti() {
         alert('Room code not found. Please join a valid room.');
         window.location.href = 'index.html'; // Redirect to home page
     }
-    console.log('Starting game with room:', roomCode, 'and mode:', mode);
+    
 </script>
 
 </body>

@@ -39,7 +39,6 @@ function joinRoom() {
         return;
     }
 
-    // Emits the joinRoom event to the server
     socket.emit('joinRoom', { 
         roomCode, 
         playerName, 
@@ -47,10 +46,11 @@ function joinRoom() {
             id: selectedCharacter.id,
             name: selectedCharacter.name,
             image: selectedCharacter.image
-        },
-        selectedCharacterImage: selectedCharacter.image // Use the full image path from characters array
+        }
     }, (response) => {
         if (response.success) {
+            localStorage.setItem('playerName', playerName); // Store name
+            localStorage.setItem('roomCode', roomCode); // Also store room code
             window.location.href = `draw.html?room=${roomCode}`;
         } else {
             alert(response.error || 'Failed to join room');

@@ -101,30 +101,26 @@
     }
 
     function startCountdown() {
-        timerInterval = setInterval(() => {
-            timeLeft--;
-            timerElement.textContent = timeLeft;
-            
-            if (timeLeft <= 0) {
-                clearInterval(timerInterval);
-                inputElement.disabled = true;
-                doneButton.disabled = true;
-                editButton.style.display = 'none';
-
-                fetch(`/getRoomDetails?room=${roomCode}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        if (data.mode === 'memory') {
-                            window.location.href = `memory.html?room=${roomCode}`;
-                        } else {
-                            window.location.href = `canvas.html?room=${roomCode}`;
-                        }
+    fetch(`/getRoomDetails?room=${roomCode}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Adjust time based on number of players
+                timeLeft = Math.max(20, Math.min(60, 20 + (data.players.length * 5)));
+                timerElement.textContent = timeLeft;
+                
+                timerInterval = setInterval(() => {
+                    timeLeft--;
+                    timerElement.textContent = timeLeft;
+                    
+                    if (timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        handleTimeExpired();
                     }
-                });
+                }, 1000);
             }
-        }, 1000);
-    }
+        });
+}
 
     // Start the countdown when page loads
     startCountdown();

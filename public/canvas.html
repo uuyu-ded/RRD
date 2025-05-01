@@ -43,29 +43,31 @@
 
         <!-- Size Adjustment -->
         <div class="size-adjustment">
-            <label for="brushSize">Size</label>
+            <label for="brushSize">Size of brush</label>
             <input type="range" id="brushSize" min="1" max="30" value="5" onchange="setSize(this.value)">
         </div>
 
         <!-- Color Picker -->
-        <div class="color-picker">
-            <label for="colorPicker">Color Picker</label>
-            <input type="color" id="colorPicker" value="#000000" onchange="setColor(this.value)">
-        </div>
+        <div class="color-section">
+            <div class="color-picker">
+                <input type="color" id="colorPicker" value="#000000" onchange="setColor(this.value)">
+            </div>
 
-        <div class="color-palette">
-            <button class="color-swatch" style="background-color: #000000;" onclick="setColor('#000000')" title="Black"></button>
-            <button class="color-swatch" style="background-color: #FF0000;" onclick="setColor('#FF0000')" title="Red"></button>
-            <button class="color-swatch" style="background-color: #00FF00;" onclick="setColor('#00FF00')" title="Green"></button>
-            <button class="color-swatch" style="background-color: #0000FF;" onclick="setColor('#0000FF')" title="Blue"></button>
-            <button class="color-swatch" style="background-color: #FFFF00;" onclick="setColor('#FFFF00')" title="Yellow"></button>
-            <button class="color-swatch" style="background-color: #FF00FF;" onclick="setColor('#FF00FF')" title="Magenta"></button>
-            <button class="color-swatch" style="background-color: #00FFFF;" onclick="setColor('#00FFFF')" title="Cyan"></button>
-            <button class="color-swatch" style="background-color: #FFFFFF; border: 1px solid #999;" onclick="setColor('#FFFFFF')" title="White"></button>
+            <div class="color-palette">
+                <button class="color-swatch" style="background-color: #000000;" onclick="setColor('#000000')" title="Black"></button>
+                <button class="color-swatch" style="background-color: #FF0000;" onclick="setColor('#FF0000')" title="Red"></button>
+                <button class="color-swatch" style="background-color: #00FF00;" onclick="setColor('#00FF00')" title="Green"></button>
+                <button class="color-swatch" style="background-color: #0000FF;" onclick="setColor('#0000FF')" title="Blue"></button>
+                <button class="color-swatch" style="background-color: #FFFF00;" onclick="setColor('#FFFF00')" title="Yellow"></button>
+                <button class="color-swatch" style="background-color: #FF00FF;" onclick="setColor('#FF00FF')" title="Magenta"></button>
+                <button class="color-swatch" style="background-color: #00FFFF;" onclick="setColor('#00FFFF')" title="Cyan"></button>
+                <button class="color-swatch" style="background-color: #FFFFFF; border: 1px solid #999;" onclick="setColor('#FFFFFF')" title="White"></button>
+            </div>
         </div>
 
         <!-- Undo and Redo Buttons -->
         <div class="toolbar-section">
+            <h3>Actions</h3>
             <div class="toolbar">
                 <button class="icon-button" onclick="undo()" id="undoButton">
                     <img src="images/undo-icon.png" alt="Undo">
@@ -76,11 +78,11 @@
             </div>
         </div>
 
-        <!-- Clear Button -->
-        <button onclick="clearCanvas()" id="clearButton">Clear</button>
-
-        <!-- Submit Button -->
-        <button class="submit-button" onclick="submitDrawing()" id="submitButton">Submit</button>
+        <!-- Clear and Submit Buttons -->
+        <div class="action-buttons">
+            <button onclick="clearCanvas()" id="clearButton">Clear</button>
+            <button class="submit-button" onclick="submitDrawing()" id="submitButton">Submit</button>
+        </div>
     </div>
 
     <script>
@@ -118,6 +120,25 @@
         ctx.fillStyle = "#FFFFFF";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         saveState();
+
+        // Adjust canvas size based on screen size
+        function resizeCanvas() {
+            const leftPanel = document.querySelector('.left-panel');
+            const maxWidth = leftPanel.clientWidth - 40; // 40px for padding
+            
+            if (window.innerWidth < 1200 && canvas.width > maxWidth) {
+                const ratio = canvas.height / canvas.width;
+                canvas.width = maxWidth;
+                canvas.height = maxWidth * ratio;
+                
+                // Redraw canvas after resize
+                redrawCanvas();
+            }
+        }
+        
+        // Call resize on load and window resize
+        window.addEventListener('load', resizeCanvas);
+        window.addEventListener('resize', resizeCanvas);
 
         function floodFill(x, y, targetColor, fillColor) {
             // Get canvas pixel data
@@ -326,7 +347,7 @@
                         x: startX, 
                         y: startY, 
                         radius, 
-                        color, 
+                        color,
                         size, 
                         seq: actionSequence++ 
                     });
@@ -426,24 +447,35 @@
     });
 }
 
-        function startTimer() { 
-            const timerEl = document.getElementById("timer"); 
-            const countdown = setInterval(() => { 
-                if (timer > 0) {
-                    timer--;
-                    timerEl.textContent = `Time: ${timer}s`;
-                    if (timer <= 10) {
-                        timerEl.style.color = "#ff0000";
+function startTimer() { 
+    // Adjust timer based on number of players
+    fetch(`/getRoomDetails?room=${roomCode}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const playerCount = data.players.length;
+                timer = Math.max(60, Math.min(120, 60 + (playerCount * 10))); // 60-120 seconds based on players
+                
+                const timerEl = document.getElementById("timer"); 
+                const countdown = setInterval(() => { 
+                    if (timer > 0) {
+                        timer--;
+                        timerEl.textContent = `Time: ${timer}s`;
+                        if (timer <= 10) {
+                            timerEl.style.color = "#ff0000";
+                        }
+                    } else {
+          
+                        clearInterval(countdown);
+                        timerEl.textContent = "Time's up!";
+                        [...document.querySelectorAll('button,input')].forEach(el => {
+                            if (el.id !== 'submitButton') el.disabled = true;
+                        });
                     }
-                } else {
-                    clearInterval(countdown);
-                    timerEl.textContent = "Time's up!";
-                    [...document.querySelectorAll('button,input')].forEach(el => {
-                        if (el.id !== 'submitButton') el.disabled = true;
-                    });
-                }
-            }, 1000);
-        }
+                }, 1000);
+            }
+        });
+}
         
         // Initialize tool highlighting
         setTool('brush');
@@ -453,6 +485,33 @@
         canvas.addEventListener("mouseup", endPosition);
         canvas.addEventListener("mousemove", draw);
         canvas.addEventListener("mouseout", endPosition);
+        
+        // Add touch support for mobile devices
+        canvas.addEventListener("touchstart", function(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent("mousedown", {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
+        });
+        
+        canvas.addEventListener("touchmove", function(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent("mousemove", {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
+        });
+        
+        canvas.addEventListener("touchend", function(e) {
+            e.preventDefault();
+            const mouseEvent = new MouseEvent("mouseup", {});
+            canvas.dispatchEvent(mouseEvent);
+        });
         
         // Start the timer
         startTimer();
