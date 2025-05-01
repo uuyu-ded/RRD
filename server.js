@@ -406,9 +406,9 @@ io.on('connection', (socket) => {
         return 1; // For larger groups, do just 1 round to keep game length reasonable
     }
 
-    socket.on('joinRoom', async ({ roomCode, playerName, selectedCharacter, selectedCharacterImage }, callback) => {
+    socket.on('joinRoom', async ({ roomCode, playerName, selectedCharacter }, callback) => {
         try {
-            if (!roomCode || !playerName || !selectedCharacter || !selectedCharacterImage) {
+            if (!roomCode || !playerName || !selectedCharacter) {
                 callback({ success: false, error: 'All fields are required!' });
                 return;
             }
@@ -427,8 +427,11 @@ io.on('connection', (socket) => {
             // Adds the player to the room
             const newPlayer = { 
                 name: playerName, 
-                character: selectedCharacter, 
-                characterImage: selectedCharacterImage 
+                character: {
+                    id: selectedCharacter.id,
+                    name: selectedCharacter.name,
+                    image: selectedCharacter.image
+                }
             };
             room.players.push(newPlayer);
             await room.save();
