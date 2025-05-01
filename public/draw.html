@@ -54,7 +54,11 @@
     const urlParams = new URLSearchParams(window.location.search);
     const roomCode = urlParams.get('room'); // Get room code from URL
 
-    const socket = io();
+    const socket = io({
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    });
     //listening for room updates
     //socket.on('roomUpdated', (room) => {
     //updatePlayerList(room.players);

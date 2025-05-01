@@ -134,29 +134,64 @@ app.post('/submitPrompt', async (req, res) => {
     const { room, prompt } = req.body;
 
     if (!room || !prompt) {
-        return res.status(400).json({ success: false, error: 'Room code and prompt are required' });
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Room code and prompt are required' 
+        });
+    }
+
+    if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Prompt must be a non-empty string' 
+        });
     }
 
     try {
         const roomDetails = await Room.findOne({ roomCode: room });
         if (!roomDetails) {
-            return res.status(404).json({ success: false, error: 'Room not found' });
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Room not found' 
+            });
+        }
+
+        if (!roomDetails.prompts) {
+            roomDetails.prompts = [];
         }
 
         // Add the prompt to the room
-        roomDetails.prompts.push(prompt);
+        roomDetails.prompts.push(prompt.trim());
         await roomDetails.save();
 
-        // Notify all clients in the room about the submission count
+        // Notify all clients in the room
         io.to(room).emit('promptSubmitted', { 
             count: roomDetails.prompts.length,
             totalPlayers: roomDetails.players.length 
         });
 
-        res.status(200).json({ success: true });
+        if (roomDetails.prompts.length >= roomDetails.players.length) {
+            // Update room status
+            roomDetails.status = 'drawing';
+            await roomDetails.save();
+            
+            // Notify all players to move to canvas
+            io.to(room).emit('allPromptsSubmitted');
+        }
+
+        return res.status(200).json({ success: true });
     } catch (error) {
-        console.error('Error submitting prompt:', error);
-        res.status(500).json({ success: false, error: 'Internal server error' });
+        console.error('Detailed error submitting prompt:', {
+            error: error.message,
+            stack: error.stack,
+            room,
+            prompt
+        });
+        return res.status(500).json({ 
+            success: false, 
+            error: 'Internal server error',
+            details: error.message 
+        });
     }
 });
 
@@ -456,8 +491,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('joinSocketRoom', (roomCode) => {
-        socket.join(roomCode);
         console.log(`Player joined socket room: ${roomCode}`);
+        socket.join(roomCode);
     });
 
     socket.on('disconnect', async () => {
