@@ -112,43 +112,49 @@
 
     // Display players in the room
     function updatePlayerList(players) {
-    const playerListElement = document.getElementById('playersList');
-    playerListElement.innerHTML = ""; // Clear current list
+        const playerListElement = document.getElementById('playersList');
+        
+        // Clear current list but keep the container structure
+        playerListElement.innerHTML = '';
+        
+        if (!players || players.length === 0) {
+            const emptyMessage = document.createElement('div');
+            emptyMessage.className = 'empty-message';
+            emptyMessage.textContent = 'Waiting for players to join...';
+            playerListElement.appendChild(emptyMessage);
+            return;
+        }
 
-    if (players.length === 0) {
-        const emptyMessage = document.createElement('div');
-        emptyMessage.className = 'empty-message';
-        emptyMessage.textContent = 'Waiting for players to join...';
-        playerListElement.appendChild(emptyMessage);
-        return;
+        players.forEach(player => {
+            const playerElement = document.createElement('div');
+            playerElement.className = 'player-entry';
+            playerElement.style.display = 'flex';
+            playerElement.style.alignItems = 'center';
+            playerElement.style.marginBottom = '10px';
+
+            // Display the character image
+            const characterImage = document.createElement('img');
+            characterImage.src = player.character.image;
+            characterImage.alt = player.character.name;
+            characterImage.style.width = '50px';
+            characterImage.style.height = '50px';
+            characterImage.style.marginRight = '10px';
+            characterImage.style.borderRadius = '50%';
+
+            // Display the player's name
+            const playerName = document.createElement('p');
+            playerName.textContent = player.name;
+            playerName.style.margin = '0';
+            playerName.style.fontWeight = 'bold';
+
+            // Append the image and name to the player element
+            playerElement.appendChild(characterImage);
+            playerElement.appendChild(playerName);
+
+            // Append the player element to the player list
+            playerListElement.appendChild(playerElement);
+        });
     }
-
-    players.forEach(player => {
-        const playerElement = document.createElement('div');
-        playerElement.style.display = 'flex';
-        playerElement.style.alignItems = 'center';
-        playerElement.style.marginBottom = '10px';
-
-        // Display the character image - use player.character.image instead of player.characterImage
-        const characterImage = document.createElement('img');
-        characterImage.src = player.character.image; // Changed from characterImage to character.image
-        characterImage.alt = player.character.name;
-        characterImage.style.width = '50px';
-        characterImage.style.height = '50px';
-        characterImage.style.marginRight = '10px';
-
-        // Display the player's name
-        const playerName = document.createElement('p');
-        playerName.textContent = player.name;
-
-        // Append the image and name to the player element
-        playerElement.appendChild(characterImage);
-        playerElement.appendChild(playerName);
-
-        // Append the player element to the player list
-        playerListElement.appendChild(playerElement);
-    });
-}
 
     // Copy room code to clipboard
     function copyRoomCode() {
@@ -222,6 +228,29 @@
     });
 }
 
+socket.on('playerJoined', (player) => {
+    // Show a notification that a new player joined
+    const notification = document.createElement('div');
+    notification.textContent = `${player.name} joined the room!`;
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.left = '50%';
+    notification.style.transform = 'translateX(-50%)';
+    notification.style.backgroundColor = '#4CAF50';
+    notification.style.color = 'white';
+    notification.style.padding = '10px 20px';
+    notification.style.borderRadius = '20px';
+    notification.style.zIndex = '1000';
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        document.body.removeChild(notification);
+    }, 3000);
+
+    // Refresh the player list (though roomUpdated should handle this)
+    fetchRoomDetails();
+});
+
 socket.on('playerLeft', ({ playerName, players }) => {
     updatePlayerList(players);
     
@@ -245,6 +274,10 @@ socket.on('playerLeft', ({ playerName, players }) => {
         }, 3000);
     }
 });
+
+socket.on('roomUpdated', (room) => {
+        updatePlayerList(room.players);
+    });
 
 socket.on('roomDeleted', ({ reason }) => {
     let message = 'The room has been closed';
