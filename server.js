@@ -347,6 +347,56 @@ app.get('/getDrawings', async (req, res) => {
     }
 });
 
+//for album
+app.get('/getAlbumData', async (req, res) => {
+    const { room } = req.query;
+    
+    if (!room) {
+        return res.status(400).json({ success: false, error: 'Room code is required' });
+    }
+
+    try {
+        const roomDetails = await Room.findOne({ roomCode: room });
+        if (!roomDetails) {
+            return res.status(404).json({ success: false, error: 'Room not found' });
+        }
+
+        // Prepare album data
+        const albumData = {
+            mode: roomDetails.mode,
+            players: roomDetails.players.map(p => p.name),
+            rounds: []
+        };
+
+        if (roomDetails.mode === 'prompt') {
+            // For prompt mode, show each player's prompt and the resulting drawings
+            for (let i = 0; i < roomDetails.rounds.length; i++) {
+                const round = roomDetails.rounds[i];
+                albumData.rounds.push({
+                    roundNumber: i + 1,
+                    prompts: round.prompts ? Object.fromEntries(round.prompts) : {},
+                    drawings: round.drawings ? Object.fromEntries(round.drawings) : {},
+                    guesses: round.guesses ? Object.fromEntries(round.guesses) : {}
+                });
+            }
+        } else {
+            // For memory mode, show all drawings for each round
+            for (let i = 0; i < roomDetails.rounds.length; i++) {
+                const round = roomDetails.rounds[i];
+                albumData.rounds.push({
+                    roundNumber: i + 1,
+                    drawings: round.drawings ? Object.fromEntries(round.drawings) : {}
+                });
+            }
+        }
+
+        res.status(200).json({ success: true, albumData });
+    } catch (error) {
+        console.error('Error fetching album data:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
 // Set up socket.io event listeners
 io.on('connection', (socket) => {
     console.log('A user connected');
@@ -670,6 +720,23 @@ io.on('connection', (socket) => {
     }
 });
     
+socket.on('showResults', ({ results }) => {
+    // After showing results, redirect to album
+    setTimeout(() => {
+        io.to(roomCode).emit('redirectToAlbum');
+    }, 10000); // 10 seconds delay before redirect
+});
+
+// Add this event listener in app.js:
+socket.on('redirectToAlbum', () => {
+    const roomCode = localStorage.getItem('roomCode');
+    window.location.href = `album.html?room=${roomCode}`;
+});
+
+socket.on('memoryGameCompleted', () => {
+    const roomCode = localStorage.getItem('roomCode');
+    window.location.href = `album.html?room=${roomCode}`;
+});
 
 });
 

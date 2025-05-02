@@ -212,52 +212,63 @@
         }
 
         function saveState() {
-            if (currentHistoryIndex < history.length - 1) {
-                history.splice(currentHistoryIndex + 1);
-            }
-            history.push({ 
-                freehandPaths: JSON.parse(JSON.stringify(freehandPaths)), 
-                shapes: JSON.parse(JSON.stringify(shapes)), 
-                actionSequence 
-            });
-            currentHistoryIndex = history.length - 1; 
-            updateUndoRedoButtons();
-        }
+    // Only save if the current state is different from the last saved state
+    const currentState = {
+        freehandPaths: JSON.parse(JSON.stringify(freehandPaths)),
+        shapes: JSON.parse(JSON.stringify(shapes)),
+        actionSequence
+    };
+    
+    // Don't save if nothing has changed
+    if (history.length > 0 && 
+        JSON.stringify(currentState) === JSON.stringify(history[currentHistoryIndex])) {
+        return;
+    }
+    
+    // If we're not at the end of history, discard future states
+    if (currentHistoryIndex < history.length - 1) {
+        history = history.slice(0, currentHistoryIndex + 1);
+    }
+    
+    history.push(currentState);
+    currentHistoryIndex = history.length - 1;
+    updateUndoRedoButtons();
+}
 
-        function undo() {
-            if (currentHistoryIndex >= 0) {
-                currentHistoryIndex--;
-                if (currentHistoryIndex >= 0) {
-                    const st = history[currentHistoryIndex]; 
-                    freehandPaths = JSON.parse(JSON.stringify(st.freehandPaths)); 
-                    shapes = JSON.parse(JSON.stringify(st.shapes)); 
-                    actionSequence = st.actionSequence;
-                } else { 
-                    freehandPaths = []; 
-                    shapes = []; 
-                    actionSequence = 0; 
-                }
-                redrawCanvas(); 
-                updateUndoRedoButtons();
-            }
-        }
+function undo() {
+    if (currentHistoryIndex <= 0) {
+        // If we're at the beginning, clear the canvas
+        freehandPaths = [];
+        shapes = [];
+        actionSequence = 0;
+        currentHistoryIndex = -1;
+    } else {
+        currentHistoryIndex--;
+        const state = history[currentHistoryIndex];
+        freehandPaths = JSON.parse(JSON.stringify(state.freehandPaths));
+        shapes = JSON.parse(JSON.stringify(state.shapes));
+        actionSequence = state.actionSequence;
+    }
+    redrawCanvas();
+    updateUndoRedoButtons();
+}
 
-        function redo() {
-            if (currentHistoryIndex < history.length - 1) {
-                currentHistoryIndex++;
-                const st = history[currentHistoryIndex]; 
-                freehandPaths = JSON.parse(JSON.stringify(st.freehandPaths)); 
-                shapes = JSON.parse(JSON.stringify(st.shapes)); 
-                actionSequence = st.actionSequence;
-                redrawCanvas(); 
-                updateUndoRedoButtons();
-            }
-        }
+function redo() {
+    if (currentHistoryIndex < history.length - 1) {
+        currentHistoryIndex++;
+        const state = history[currentHistoryIndex];
+        freehandPaths = JSON.parse(JSON.stringify(state.freehandPaths));
+        shapes = JSON.parse(JSON.stringify(state.shapes));
+        actionSequence = state.actionSequence;
+        redrawCanvas();
+        updateUndoRedoButtons();
+    }
+}
 
-        function updateUndoRedoButtons() {
-            document.getElementById("undoButton").disabled = currentHistoryIndex < 0;
-            document.getElementById("redoButton").disabled = currentHistoryIndex >= history.length - 1;
-        }
+function updateUndoRedoButtons() {
+    document.getElementById("undoButton").disabled = currentHistoryIndex <= 0;
+    document.getElementById("redoButton").disabled = currentHistoryIndex >= history.length - 1;
+}
 
         function setTool(t) { 
             tool = t; 
@@ -424,37 +435,73 @@
         }
 
         function submitDrawing() {
-            const canvasData = canvas.toDataURL();
-            const playerName = "currentPlayerName"; // Get this from your session
+    const canvasData = canvas.toDataURL();
+    const playerName = localStorage.getItem('playerName');
     
-            fetch(`/submitDrawing`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                room: roomCode, 
-                drawing: canvasData, 
-                playerName 
-            }),
-        })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // After submitting drawing, go to description page
-            window.location.href = `describe.html?room=${roomCode}`;
-        }
-    });
+    fetch(`/getRoomDetails?room=${roomCode}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const isFinalRound = data.currentRound >= data.maxRounds;
+                
+                if (isMemoryMode) {
+                    // Memory mode submission
+                    fetch(`/submitMemoryDrawing`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ 
+                            room: roomCode, 
+                            round: round,
+                            drawing: canvasData, 
+                            playerName 
+                        }),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Always go to album in final round, otherwise to viewing phase
+                            window.location.href = isFinalRound 
+                                ? `album.html?room=${roomCode}` 
+                                : `memory.html?room=${roomCode}&viewing=true`;
+                        }
+                    });
+                } else {
+                    // Prompt mode submission
+                    fetch(`/submitDrawing`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ 
+                            room: roomCode, 
+                            drawing: canvasData, 
+                            playerName 
+                        }),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Always go to album in final round, otherwise to describe phase
+                            window.location.href = isFinalRound 
+                                ? `album.html?room=${roomCode}` 
+                                : `describe.html?room=${roomCode}`;
+                        }
+                    });
+                }
+            }
+        });
 }
 
 function startTimer() { 
-    // Adjust timer based on number of players
     fetch(`/getRoomDetails?room=${roomCode}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 const playerCount = data.players.length;
-                timer = Math.max(60, Math.min(120, 60 + (playerCount * 10))); // 60-120 seconds based on players
+                timer = Math.max(60, Math.min(120, 60 + (playerCount * 10)));
+                const isFinalRound = data.currentRound >= data.maxRounds;
                 
                 const timerEl = document.getElementById("timer"); 
                 const countdown = setInterval(() => { 
@@ -465,12 +512,18 @@ function startTimer() {
                             timerEl.style.color = "#ff0000";
                         }
                     } else {
-          
                         clearInterval(countdown);
                         timerEl.textContent = "Time's up!";
                         [...document.querySelectorAll('button,input')].forEach(el => {
-                            if (el.id !== 'submitButton') el.disabled = true;
+                            el.disabled = true;
                         });
+                        
+                        // Auto-submit - always go to album in final round
+                        if (isFinalRound) {
+                            window.location.href = `album.html?room=${roomCode}`;
+                        } else {
+                            document.getElementById('submitButton').click();
+                        }
                     }
                 }, 1000);
             }
@@ -517,41 +570,58 @@ function startTimer() {
         startTimer();
 
         if (isMemoryMode) {
-            // Adjust timer for memory mode
-            timer = 120;
-            
-            // Modify submit button for memory mode
             document.getElementById('submitButton').addEventListener('click', () => {
-                const canvasData = canvas.toDataURL();
-                const playerName = "currentPlayerName";
-                
-                fetch(`/submitMemoryDrawing`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        room: roomCode, 
-                        round,
-                        drawing: canvasData, 
-                        playerName 
-                    }),
-                })
+        const canvasData = canvas.toDataURL();
+        const playerName = localStorage.getItem('playerName');
+        
+        fetch(`/getRoomDetails?room=${roomCode}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const isFinalRound = data.currentRound >= data.maxRounds;
+                    
+                    fetch(`/submitMemoryDrawing`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ 
+                            room: roomCode, 
+                            round,
+                            drawing: canvasData, 
+                            playerName 
+                        }),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            window.location.href = isFinalRound 
+                                ? `album.html?room=${roomCode}` 
+                                : `memory.html?room=${roomCode}&viewing=true`;
+                        }
+                    });
+                }
+            });
+    });
+    
+    // Auto-submit if time runs out
+    const timerInterval = setInterval(() => {
+        if (timer <= 0) {
+            clearInterval(timerInterval);
+            fetch(`/getRoomDetails?room=${roomCode}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        window.location.href = `memory.html?room=${roomCode}&viewing=true`;
+                        const isFinalRound = data.currentRound >= data.maxRounds;
+                        if (isFinalRound) {
+                            window.location.href = `album.html?room=${roomCode}`;
+                        } else {
+                            document.getElementById('submitButton').click();
+                        }
                     }
                 });
-            });
-            
-            // Auto-submit if time runs out
-            const timerInterval = setInterval(() => {
-                if (timer <= 0) {
-                    clearInterval(timerInterval);
-                    document.getElementById('submitButton').click();
-                }
-            }, 1000);
+        }
+    }, 1000);
         }
     </script>
 </body>
