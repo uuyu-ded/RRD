@@ -19,6 +19,16 @@ const io = new Server(server); // Initialize socket.io on the server
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    // Don't exit the process, just log the error
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit the process, just log the error
+});
+
 async function rotateDrawings(roomCode) {
     const room = await Room.findOne({ roomCode });
     if (!room || !room.drawings) return;
@@ -525,9 +535,6 @@ io.on('connection', (socket) => {
             socket.join(roomCode);
             socket.playerName = playerName;
             
-            // Notifies the joining player
-            callback({ success: true, room });
-            
             // Notifies all other players in the room
             io.to(roomCode).emit('playerJoined', {
                 name: newPlayer.name,
@@ -603,6 +610,9 @@ io.on('connection', (socket) => {
                 callback({ success: false, error: 'Room not found' });
                 return;
             }
+            if (typeof callback !== 'function') {
+                callback = () => {}; // Provide a no-op function if callback isn't provided
+            }
     
             // Check if this was the room creator (first player)
             const wasCreator = room.players.length > 0 && room.players[0].name === playerName;
@@ -633,10 +643,10 @@ io.on('connection', (socket) => {
             // Leave the socket room
             socket.leave(roomCode);
             
-            callback({ success: true });
+            if (callback) callback({ success: true });
         } catch (error) {
             console.error('Error leaving room:', error);
-            callback({ success: false, error: 'Error leaving room' });
+             if (callback) callback({ success: false, error: 'Error leaving room'});
         }
     });
 

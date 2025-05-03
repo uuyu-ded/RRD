@@ -1,5 +1,21 @@
+const socket = io({
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+});
 
-const socket = io();
+socket.on('connect_error', (error) => {
+    console.error('Connection Error:', error);
+    alert('Failed to connect to server. Please refresh the page.');
+});
+
+socket.on('disconnect', (reason) => {
+    console.log('Disconnected:', reason);
+    if (reason === 'io server disconnect') {
+        // Server intentionally disconnected, try to reconnect
+        socket.connect();
+    }
+});
 
 function createRoom() {
     try {
