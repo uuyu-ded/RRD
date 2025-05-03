@@ -226,6 +226,11 @@
     });
 }
 
+socket.on('playerJoined', (player) => {
+    fetchRoomDetails(); // Refresh the entire player list
+    console.log('Player joined:', player);
+});
+
 socket.on('playerLeft', ({ playerName, players }) => {
     updatePlayerList(players);
     

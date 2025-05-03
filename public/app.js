@@ -65,8 +65,8 @@ socket.on('roomJoined', (room) => {
     updatePlayerList(room.players);
 });
 
+// Change the playerJoined handler to:
 socket.on('playerJoined', (player) => {
-    // Adds the new player to the list
     const playersList = document.getElementById('playersList');
     const playerElement = document.createElement('div');
     playerElement.innerHTML = `
@@ -77,6 +77,11 @@ socket.on('playerJoined', (player) => {
     playerElement.style.alignItems = 'center';
     playerElement.style.marginBottom = '10px';
     playersList.appendChild(playerElement);
+    
+    const emptyMessage = playersList.querySelector('.empty-message');
+    if (emptyMessage) {
+        playersList.removeChild(emptyMessage);
+    }
 });
 
 

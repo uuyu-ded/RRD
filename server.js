@@ -529,7 +529,11 @@ io.on('connection', (socket) => {
             callback({ success: true, room });
             
             // Notifies all other players in the room
-            io.to(roomCode).emit('playerJoined', newPlayer);
+            io.to(roomCode).emit('playerJoined', {
+                name: newPlayer.name,
+                character: newPlayer.character.name,
+                characterImage: newPlayer.character.image
+            });
             
             // Updates the player list for everyone
             io.to(roomCode).emit('roomUpdated', room);

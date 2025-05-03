@@ -6,28 +6,29 @@
   "scripts": {
     "dev": "vite",
     "start": "node server.js",
-    "build": "echo 'no build needed'",
+    "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "serve": "node server.js"
   },
   "dependencies": {
     "express": "^4.21.2",
     "mongoose": "^8.10.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
-    "@vitejs/plugin-react": "^1.3.2",
+    "@vitejs/plugin-react": "^4.2.1",
     "eslint": "^9.19.0",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.18",
     "globals": "^15.14.0",
-    "vite": "^0.10.3"
+    "vite": "^5.1.4"
   }
-  
 }
