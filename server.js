@@ -533,6 +533,7 @@ io.on('connection', (socket) => {
             
             // Updates the player list for everyone
             io.to(roomCode).emit('roomUpdated', room);
+            callback({ success: true, room });
     
         } catch (error) {
             console.error('Error joining room:', error);
@@ -540,9 +541,15 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('joinSocketRoom', (roomCode) => {
+    socket.on('joinSocketRoom', async (roomCode) => {
         console.log(`Player joined socket room: ${roomCode}`);
         socket.join(roomCode);
+
+        // Send current room state to the newly joined client
+        const room = await Room.findOne({ roomCode });
+        if (room) {
+            socket.emit('roomUpdated', room);
+        }
     });
 
     socket.on('disconnect', async () => {

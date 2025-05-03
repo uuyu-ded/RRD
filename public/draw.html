@@ -60,9 +60,9 @@
     reconnectionDelay: 1000,
     });
     //listening for room updates
-    //socket.on('roomUpdated', (room) => {
-    //updatePlayerList(room.players);
-    //});
+    socket.on('roomUpdated', (room) => {
+    updatePlayerList(room.players);
+    });
 
     // Initializes socket connection and room when page loads
     document.addEventListener('DOMContentLoaded', () => {
@@ -88,27 +88,25 @@
 
     // Fetch room details (room code and players) from the server
     function fetchRoomDetails() {
-        fetch(`/getRoomDetails?room=${roomCode}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Display room code
-                    document.getElementById('roomCodeDisplay').value = data.roomCode;
-
-                    // Update players list
-                    const players = data.players;
-                    updatePlayerList(players);
-                } else {
-                    alert(data.error);
-                    window.location.href = 'index.html'; // Redirect to home page
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching room details:', error);
-                alert('Failed to fetch room details');
-                window.location.href = 'index.html'; // Redirect to home page
-            });
-    }
+    fetch(`/getRoomDetails?room=${roomCode}`)
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                document.getElementById('roomCodeDisplay').value = data.roomCode;
+                updatePlayerList(data.players);
+            } else {
+                throw new Error(data.error || 'Failed to fetch room details');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching room details:', error);
+            alert(error.message);
+            window.location.href = 'index.html';
+        });
+}
 
     // Display players in the room
     function updatePlayerList(players) {
@@ -228,29 +226,6 @@
     });
 }
 
-socket.on('playerJoined', (player) => {
-    // Show a notification that a new player joined
-    const notification = document.createElement('div');
-    notification.textContent = `${player.name} joined the room!`;
-    notification.style.position = 'fixed';
-    notification.style.top = '20px';
-    notification.style.left = '50%';
-    notification.style.transform = 'translateX(-50%)';
-    notification.style.backgroundColor = '#4CAF50';
-    notification.style.color = 'white';
-    notification.style.padding = '10px 20px';
-    notification.style.borderRadius = '20px';
-    notification.style.zIndex = '1000';
-    document.body.appendChild(notification);
-
-    setTimeout(() => {
-        document.body.removeChild(notification);
-    }, 3000);
-
-    // Refresh the player list (though roomUpdated should handle this)
-    fetchRoomDetails();
-});
-
 socket.on('playerLeft', ({ playerName, players }) => {
     updatePlayerList(players);
     
@@ -274,10 +249,6 @@ socket.on('playerLeft', ({ playerName, players }) => {
         }, 3000);
     }
 });
-
-socket.on('roomUpdated', (room) => {
-        updatePlayerList(room.players);
-    });
 
 socket.on('roomDeleted', ({ reason }) => {
     let message = 'The room has been closed';
