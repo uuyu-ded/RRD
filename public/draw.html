@@ -50,15 +50,10 @@
     <!-- Confetti Effect for Game Start -->
     <canvas id="confetti-canvas" style="position: fixed; top: 0; left: 0; pointer-events: none; z-index: 100; width: 100%; height: 100%; display: none;"></canvas>
 
-<script src="app.js"></script>
+<script src="server.js"></script>
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const roomCode = urlParams.get('room'); // Get room code from URL
-
-    //listening for room updates
-    socket.on('roomUpdated', (room) => {
-    updatePlayerList(room.players);
-    });
 
     // Initializes socket connection and room when page loads
     document.addEventListener('DOMContentLoaded', () => {
@@ -85,10 +80,20 @@
     }
 
     // Fetch room details (room code and players) from the server
-    function fetchRoomDetails() {
+    // In draw.html
+function fetchRoomDetails() {
     fetch(`/getRoomDetails?room=${roomCode}`)
         .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
+            if (!response.ok) {
+                // Check if we got an HTML error page instead of JSON
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('text/html')) {
+                    return response.text().then(html => {
+                        throw new Error('Server returned HTML error page');
+                    });
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             return response.json();
         })
         .then(data => {
@@ -101,7 +106,7 @@
         })
         .catch(error => {
             console.error('Error fetching room details:', error);
-            alert(error.message);
+            alert('Error fetching room details: ' + error.message);
             window.location.href = 'index.html';
         });
 }
@@ -224,9 +229,35 @@
     });
 }
 
-socket.on('playerJoined', (player) => {
-    fetchRoomDetails(); // Refresh the entire player list
-    console.log('Player joined:', player);
+//listening for room updates
+socket.on('roomUpdated', (room) => {
+        document.getElementById('roomCodeDisplay').value = room.roomCode;
+    updatePlayerList(room.players);
+    // Store current player count
+    localStorage.setItem('playerCount', room.players.length);
+    });
+
+    socket.on('playerJoined', (player) => {
+    // Refresh the player list from server
+    fetchRoomDetails();
+    
+    // Show join notification
+    const notification = document.createElement('div');
+    notification.textContent = `${player.name} joined the room`;
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.left = '50%';
+    notification.style.transform = 'translateX(-50%)';
+    notification.style.backgroundColor = '#4CAF50';
+    notification.style.color = 'white';
+    notification.style.padding = '10px 20px';
+    notification.style.borderRadius = '20px';
+    notification.style.zIndex = '1000';
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        document.body.removeChild(notification);
+    }, 3000);
 });
 
 socket.on('playerLeft', ({ playerName, players }) => {
@@ -384,15 +415,7 @@ function showConfetti() {
         
         animate();
     }
-    
-    // Initialize room
-    if (roomCode) {
-        fetchRoomDetails();
-    } else {
-        alert('Room code not found. Please join a valid room.');
-        window.location.href = 'index.html'; // Redirect to home page
-    }
-    
+
 </script>
 
 </body>

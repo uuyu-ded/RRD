@@ -2,8 +2,20 @@ const socket = io({
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
+    autoConnect: true
 });
-
+let isConnected = false;
+let connectionState = 'disconnected';
+socket.on('connect', () => {
+    console.log('Connected to server');
+    isConnected = true;
+    
+    // Join room if we have a room code
+    const roomCode = localStorage.getItem('roomCode');
+    if (roomCode) {
+        socket.emit('joinSocketRoom', roomCode);
+    }
+});
 socket.on('connect_error', (error) => {
     console.error('Connection Error:', error);
     alert('Failed to connect to server. Please refresh the page.');
@@ -11,10 +23,22 @@ socket.on('connect_error', (error) => {
 
 socket.on('disconnect', (reason) => {
     console.log('Disconnected:', reason);
+    isConnected = false;
     if (reason === 'io server disconnect') {
         // Server intentionally disconnected, try to reconnect
+        console.log('Server initiated disconnect - attempting to reconnect');
         socket.connect();
     }
+});
+
+socket.on('reconnect_attempt', (attempt) => {
+    connectionState = 'reconnecting';
+    console.log(`Reconnection attempt ${attempt}`);
+});
+
+socket.on('reconnect_failed', () => {
+    connectionState = 'failed';
+    alert('Failed to reconnect to server. Please refresh the page.');
 });
 
 function createRoom() {

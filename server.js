@@ -530,17 +530,10 @@ io.on('connection', (socket) => {
             };
             room.players.push(newPlayer);
             await room.save();
-    
             // Joins the socket.io room
             socket.join(roomCode);
             socket.playerName = playerName;
-            
-            // Notifies all other players in the room
-            io.to(roomCode).emit('playerJoined', {
-                name: newPlayer.name,
-                character: newPlayer.character.name,
-                characterImage: newPlayer.character.image
-            });
+            socket.roomCode = roomCode;
             
             // Updates the player list for everyone
             io.to(roomCode).emit('roomUpdated', room);
@@ -603,52 +596,43 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('leaveRoom', async ({ roomCode, playerName }, callback) => {
-        try {
-            const room = await Room.findOne({ roomCode });
-            if (!room) {
-                callback({ success: false, error: 'Room not found' });
-                return;
-            }
-            if (typeof callback !== 'function') {
-                callback = () => {}; // Provide a no-op function if callback isn't provided
-            }
-    
-            // Check if this was the room creator (first player)
-            const wasCreator = room.players.length > 0 && room.players[0].name === playerName;
-            
-            // Remove the player
-            room.players = room.players.filter(p => p.name !== playerName);
-            
-            if (room.players.length === 0 || wasCreator) {
-                // Delete the entire room if empty or if creator left
-                await Room.deleteOne({ roomCode });
-                console.log(`Room ${roomCode} deleted (creator left or room empty)`);
-                
-                // Notify all players in the room that it's being deleted
-                io.to(roomCode).emit('roomDeleted', { 
-                    reason: wasCreator ? 'creator_left' : 'last_player_left'
-                });
-            } else {
-                // Otherwise just save the updated player list
-                await room.save();
-                
-                // Notify remaining players
-                io.to(roomCode).emit('playerLeft', { 
-                    playerName,
-                    players: room.players 
-                });
-            }
-    
-            // Leave the socket room
-            socket.leave(roomCode);
-            
-            if (callback) callback({ success: true });
-        } catch (error) {
-            console.error('Error leaving room:', error);
-             if (callback) callback({ success: false, error: 'Error leaving room'});
+socket.on('leaveRoom', async ({ roomCode, playerName }, callback) => {
+    try {
+        const room = await Room.findOne({ roomCode });
+        if (!room) {
+            if (callback) callback({ success: false, error: 'Room not found' });
+            return;
         }
-    });
+
+        // Remove player from room
+        room.players = room.players.filter(p => p.name !== playerName);
+        
+        // Check if room should be deleted
+        const wasCreator = room.players.length > 0 && room.players[0].name === playerName;
+        let shouldDeleteRoom = wasCreator || room.players.length === 0;
+
+        if (shouldDeleteRoom) {
+            await Room.deleteOne({ roomCode });
+            io.to(roomCode).emit('roomDeleted', { 
+                reason: wasCreator ? 'creator_left' : 'last_player_left'
+            });
+        } else {
+            await room.save();
+            io.to(roomCode).emit('playerLeft', {
+                playerName,
+                players: room.players
+            });
+        }
+
+        // Leave socket.io room
+        socket.leave(roomCode);
+        
+        if (callback) callback({ success: true });
+    } catch (error) {
+        console.error('Error leaving room:', error);
+        if (callback) callback({ success: false, error: 'Error leaving room' });
+    }
+});
 
     socket.on('submitGuess', async ({ roomCode, guess, playerName }, callback) => {
         try {
