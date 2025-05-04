@@ -1,6 +1,6 @@
 import express from 'express';
 import http from 'http';
-import { Server } from 'socket.io';
+const socketIo = require('socket.io');
 import connectDB from './db.js'; // MongoDB connection
 import { Room } from './rooms.js'; // Room model 
 import path from 'path';
@@ -13,7 +13,7 @@ const app = express();
 connectDB();
 
 const server = http.createServer(app);
-const io = new Server(server); // Initialize socket.io on the server
+const io = socketIo(server); // Initialize socket.io on the server
 
 // Middleware to parse JSON
 app.use(express.json());
